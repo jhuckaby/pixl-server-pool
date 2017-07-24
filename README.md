@@ -841,7 +841,7 @@ exports.custom = function(args, callback) {
 
 As you can see, `args.params` contains everything passed in the `user_req` object demonstrated above.  See [Custom Request Args](#custom-request-args) for a list of everything available in `args.  After completing your custom work, fire the callback with an `Error` if one occurred (or `null`/`false` if not) and a custom user-defined response object, which will be passed back to the calling code in the parent web process.  Your user-defined response object must also be able to survive serialization to/from JSON.  So please use only JavaScript primitives, like objects, arrays, strings, numbers and/or booleans.
 
-Please note that custom requests still count against the worker's [Max Requests Per Child](#max-requests-per-child), and the pooler still honor things like [Max Concurrent Requests](#max-concurrent-requests).  A single worker is still chosen from the pool using the [Worker Selection Algorithm](#worker-selection-algorithm), and only idle workers (those not starting up, shutting down or in maintenance mode) are picked.  The only real difference here is that a custom request isn't HTTP specific -- it is 100% user defined, in both the request and the response.
+Please note that custom requests still count against the worker's [Max Requests Per Child](#max-requests-per-child), and the pooler still honors things like [Max Concurrent Requests](#max-concurrent-requests).  A single worker is still chosen from the pool using the [Worker Selection Algorithm](#worker-selection-algorithm), and only idle workers (those not starting up, shutting down or in maintenance mode) are picked.  The only real difference here is that a custom request isn't HTTP specific -- it is 100% user defined, in both the request and the response.
 
 ### Custom Request Args
 
@@ -1238,7 +1238,7 @@ worker.shutdown();
 
 ### Worker
 
-The `Worker` object is a singleton that runs in every child worker process.  It handles all the communication with the parent process, and calls your worker script exported functions when necessary.  It also provides a few API calls and properties you can access.
+The `Worker` object is a singleton that exists in every child worker process.  It handles all the communication with the parent process, and calls your worker script's exported functions when necessary.  It also provides a few API calls and properties you can access.
 
 The object is passed to your exported `startup()` function in your worker script.  It is recommended that you save this so you can access it later.  Example:
 
