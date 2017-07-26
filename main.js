@@ -38,7 +38,7 @@ module.exports = Class.create({
 		if (wp_config) {
 			for (var pool_key in wp_config) {
 				var pool_config = wp_config[pool_key];
-				if (pool_config.enabled) {
+				if (!("enabled" in pool_config) || pool_config.enabled) {
 					pool_config.id = pool_key;
 					var pool = new WorkerPool(pool_config, this);
 					this.worker_pools[pool_key] = pool;
