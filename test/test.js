@@ -158,6 +158,9 @@ module.exports = {
 				test.ok( !!resp.pid, "Got PID in response" );
 				test.ok( !!pool.getWorker(resp.pid), "PID matches active worker" );
 				
+				test.ok( !!resp.hostname, "Got hostname in response" );
+				test.ok( resp.hostname == server.hostname, "Correct hostname from worker: " + resp.hostname );
+				
 				test.done();
 			} ); // delegateCustom
 		},

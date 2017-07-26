@@ -33,7 +33,9 @@ var worker = {
 		// receive data packet from parent
 		switch (req.cmd) {
 			case 'startup':
-				this.config = req.config;
+				for (var key in req) {
+					if (key != 'cmd') this[key] = req[key];
+				}
 				this.startup();
 			break;
 			

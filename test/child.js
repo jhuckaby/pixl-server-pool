@@ -28,7 +28,8 @@ module.exports = {
 					cookies: req.cookies,
 					files: req.files,
 					headers: req.headers,
-					pid: process.pid
+					pid: process.pid,
+					hostname: this.worker.server.hostname
 				};
 				
 				// if we received a binary buffer, don't echo it back, just send info
@@ -91,7 +92,8 @@ module.exports = {
 			description: "Success",
 			user: { Name: "Joe", Email: "foo@bar.com" },
 			params: req.params,
-			pid: process.pid
+			pid: process.pid,
+			hostname: this.worker.server.hostname
 		} );
 	},
 	

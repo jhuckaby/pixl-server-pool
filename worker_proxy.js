@@ -46,7 +46,7 @@ module.exports = Class.create({
 	startup: function(callback) {
 		// launch child, callback when ready
 		var self = this;
-		this.logDebug(4, "Worker starting up");
+		this.logDebug(4, "Worker starting up" );
 		
 		var child_cmd = this.config.exec_path || process.execPath;
 		
@@ -59,7 +59,8 @@ module.exports = Class.create({
 			// standard worker.js wrapper
 			child_args = [].concat(
 				process.execArgv,
-				Path.join( __dirname, "worker.js" )
+				Path.join( __dirname, "worker.js" ),
+				process.argv.slice(2)
 			);
 		}
 		
@@ -196,7 +197,14 @@ module.exports = Class.create({
 		} ); // on exit
 		
 		// send initial config to child
-		this.stream.write({ cmd: 'startup', config: this.config });
+		this.stream.write({
+			cmd: 'startup', 
+			config: this.config,
+			server: {
+				hostname: this.pool.manager.server.hostname,
+				ip: this.pool.manager.server.ip
+			}
+		});
 		
 		this.logDebug(4, "Spawned new child process: " + this.pid, { cmd: child_cmd, args: child_args, script: this.config.script || 'n/a' });
 	},
