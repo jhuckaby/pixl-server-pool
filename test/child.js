@@ -8,6 +8,12 @@ module.exports = {
 	startup: function(worker, callback) {
 		// child is starting up
 		this.worker = worker;
+		
+		// add special child-side URI route
+		worker.addURIHandler( /\/childroute/, "Child Route", function(args, callback) {
+			callback({ code: 0, routed: true });
+		} );
+		
 		callback();
 	},
 	

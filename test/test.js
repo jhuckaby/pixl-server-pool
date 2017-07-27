@@ -243,6 +243,29 @@ module.exports = {
 			);
 		},
 		
+		function testChildRouteExternalRequest(test) {
+			// test real HTTP GET request to webserver backend, using child routed URI
+			var self = this;
+			
+			request.json( 'http://127.0.0.1:3020/pool1/childroute', false,
+				{
+					headers: {
+						'X-Test': "Test"
+					}
+				},
+				function(err, resp, json, perf) {
+					test.ok( !err, "No error from PixlRequest: " + err );
+					test.ok( !!resp, "Got resp from PixlRequest" );
+					test.ok( resp.statusCode == 200, "Got 200 response: " + resp.statusCode );
+					test.ok( resp.headers['via'] == "WebServerTest 1.0", "Correct Via header: " + resp.headers['via'] );
+					test.ok( !!json, "Got JSON in response" );
+					test.ok( json.code == 0, "Correct code in JSON response: " + json.code );
+					test.ok( json.routed == true, "Found 'routed' property, with correct value, in response JSON" );
+					test.done();
+				} 
+			);
+		},
+		
 		// http 429
 		function testTooManyRequests(test) {
 			// TestPool1 only allows 1 concurrent req, so let's go beyond it

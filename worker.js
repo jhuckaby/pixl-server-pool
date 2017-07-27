@@ -182,7 +182,7 @@ var worker = {
 		};
 		
 		// call custom URI handler, or the generic user_obj.handler()
-		if (handler) handler( req, handleResponse );
+		if (handler) handler.callback( req, handleResponse );
 		else if (req.cmd == 'custom') this.user_obj.custom( req, handleResponse );
 		else this.user_obj.handler( req, handleResponse );
 	},
