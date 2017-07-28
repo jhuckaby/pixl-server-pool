@@ -122,8 +122,9 @@ module.exports = Class.create({
 		} );
 		
 		this.stream.on('text', function(line) {
-			// received non-json text from child, log it
-			self.logError('child', "Received garbage from child: " + self.pid + ": " + line);
+			// received non-json text from child, log it or pass through if debug mode
+			if (self.pool.manager.server.debug) process.stdout.write(line);
+			else self.logError('child', "Received garbage from child: " + self.pid + ": " + line);
 		} );
 		
 		this.stream.on('error', function(err, text) {
@@ -134,7 +135,8 @@ module.exports = Class.create({
 		// listen on stderr as well (stack trace, etc.)
 		this.child.stderr.setEncoding('utf8');
 		this.child.stderr.on('data', function(data) {
-			self.logError('child', "Received error from child: " + self.pid + ": " + data);
+			if (self.pool.manager.server.debug) process.stderr.write(''+data);
+			else self.logError('child', "Received error from child: " + self.pid + ": " + data);
 		});
 		
 		this.child.on('error', function (err) {
