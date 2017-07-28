@@ -10,6 +10,7 @@ var async = require('async');
 var Class = require("pixl-class");
 var Tools = require("pixl-tools");
 var JSONStream = require("pixl-json-stream");
+var Perf = require("pixl-perf");
 
 module.exports = Class.create({
 	// WorkerProxy represents one single worker process, but runs in the parent process
