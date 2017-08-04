@@ -1,6 +1,6 @@
 {
 	"name": "pixl-server-pool",
-	"version": "1.0.4",
+	"version": "1.0.5",
 	"description": "A pixl-server add-on component for managing child worker pools.",
 	"author": "Joseph Huckaby <jhuckaby@gmail.com>",
 	"homepage": "https://github.com/jhuckaby/pixl-server-pool",
@@ -22,6 +22,7 @@
 	],
 	"dependencies": {
 		"async": "^2.0.0",
+		"uncatch": "^1.0.0",
 		"pixl-server": "^1.0.0",
 		"pixl-class": "^1.0.0",
 		"pixl-perf": "^1.0.3",

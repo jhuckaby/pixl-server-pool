@@ -205,7 +205,8 @@ module.exports = Class.create({
 			config: this.config,
 			server: {
 				hostname: this.pool.manager.server.hostname,
-				ip: this.pool.manager.server.ip
+				ip: this.pool.manager.server.ip,
+				uncatch: this.pool.manager.uncatch
 			}
 		});
 		

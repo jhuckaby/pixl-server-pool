@@ -18,16 +18,29 @@ module.exports = Class.create({
 	
 	defaultConfig: {
 		ticks: true,
-		startup_threads: 1
+		startup_threads: 1,
+		uncatch: false
 	},
 	
 	worker_pools: null,
+	uncatch: false,
 	
 	startup: function(callback) {
 		// start worker pool system
 		var self = this;
 		this.worker_pools = {};
 		this.logDebug(3, "pixl-server-pool v" + this.version + " starting up");
+		
+		// optionally kill all children on uncaught exception
+		if (this.config.get('uncatch')) {
+			this.uncatch = true;
+			
+			require('uncatch').on('uncaughtException', function(err) {
+				self.logger.set('sync', true);
+				self.logDebug(1, "Uncaught Exception: " + err);
+				self.emergencyShutdown();
+			});
+		}
 		
 		// listen for tick events to manage children
 		if (this.config.get('ticks')) {
@@ -158,6 +171,21 @@ module.exports = Class.create({
 			); // each
 		}
 		else callback();
+	},
+	
+	emergencyShutdown: function(signal) {
+		// kill all children as soon as possible (crash, etc.)
+		if (!signal) signal = 'SIGTERM';
+		this.logDebug(1, "Emergency shutdown, killing all children");
+		
+		for (var pool_key in this.worker_pools) {
+			var pool = this.worker_pools[pool_key];
+			var workers = pool.getWorkers();
+			for (var pid in workers) {
+				this.logDebug(2, "Killing " + pool_key + " PID " + pid + " with signal " + signal);
+				process.kill( pid, signal );
+			}
+		}
 	}
 	
 }); // class

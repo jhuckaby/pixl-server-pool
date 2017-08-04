@@ -25,8 +25,18 @@ var worker = {
 	
 	run: function() {
 		// startup child process
+		var self = this;
+		
 		this.stream = new JSONStream( process.stdin, process.stdout );
 		this.stream.on('json', this.receiveCommand.bind(this));
+		
+		process.on('SIGTERM', function() {
+			// caught SIGTERM, which means the parent crashed
+			var err = new Error("Caught SIGTERM: Emergency Pool Shutdown");
+			err.code = 'SIGTERM';
+			self.emergencyShutdown( err );
+			process.exit(1);
+		});
 	},
 	
 	receiveCommand: function(req) {
@@ -61,10 +71,20 @@ var worker = {
 	startup: function() {
 		// load user code and allow it to startup async
 		var self = this;
+		
+		// optionally listen for uncaught exceptions and shutdown
+		if (this.server.uncatch) {
+			require('uncatch').on('uncaughtException', function(err) {
+				self.emergencyShutdown(err);
+			});
+		}
+		
+		// load user module
 		this.user_obj = require(
 			this.config.script.match(/^\//) ? this.config.script : Path.join(process.cwd(), this.config.script) 
 		);
 		
+		// call user startup
 		if (this.user_obj.startup) {
 			this.user_obj.startup( this, function(err) {
 				if (err) throw err;
@@ -223,25 +243,6 @@ var worker = {
 		}
 	},
 	
-	shutdown: function() {
-		// exit child process when we're idle
-		if (this.num_active_requests) {
-			this.request_shutdown = true;
-			return;
-		}
-		this.request_shutdown = false;
-		
-		// allow user code to run its own async shutdown routine
-		if (this.user_obj.shutdown) {
-			this.user_obj.shutdown( function() {
-				process.exit(0);
-			} );
-		}
-		else {
-			process.exit(0);
-		}
-	},
-	
 	sendCommand: function(cmd, data) {
 		// send command back to parent
 		if (!data) data = {};
@@ -275,8 +276,37 @@ var worker = {
 		this.uriHandlers = this.uriHandlers.filter( function(item) {
 			return( item.name != name );
 		} );
-	}
+	},
 	
+	shutdown: function() {
+		// exit child process when we're idle
+		if (this.num_active_requests) {
+			this.request_shutdown = true;
+			return;
+		}
+		this.request_shutdown = false;
+		
+		// allow user code to run its own async shutdown routine
+		if (this.user_obj.shutdown) {
+			this.user_obj.shutdown( function() {
+				process.exit(0);
+			} );
+		}
+		else {
+			process.exit(0);
+		}
+	},
+	
+	emergencyShutdown: function(err) {
+		// emergency shutdown, due to crash
+		if (this.user_obj && this.user_obj.emergencyShutdown) {
+			this.user_obj.emergencyShutdown(err);
+		}
+		else if (this.user_obj && this.user_obj.shutdown) {
+			this.user_obj.shutdown( function() { /* no-op */ } );
+		}
+		// Note: not calling process.exit here, because uncatch does it for us
+	}
 };
 
 worker.run();

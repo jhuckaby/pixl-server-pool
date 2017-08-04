@@ -50,6 +50,7 @@ Worker pools can have a fixed number of workers, or grow/shrink automatically ba
 		+ [Custom Request Errors](#custom-request-errors)
 	* [Sending Custom Pool Messages](#sending-custom-pool-messages)
 		+ [Custom Worker-Sent Messages](#custom-worker-sent-messages)
+	* [Uncaught Exceptions](#uncaught-exceptions)
 	* [Events](#events)
 		+ [message](#message)
 		+ [autoscale](#autoscale)
@@ -172,6 +173,7 @@ The configuration for this component is specified by passing in a `PoolManager` 
 |---------------|---------------|-------------|
 | `pools` | `{}` | Define worker pools to launch on startup (see below). |
 | `startup_threads` | `1` | How many concurrent threads to use when launching multiple startup pools. |
+| `uncatch` | `false` | Set to `true` to use [uncatch](https://www.npmjs.com/package/uncatch) for handling uncaught exceptions (see [Uncaught Exceptions](#uncaught-exceptions) below). |
 
 Inside the `pools` object you can define one or more worker pools, which will all be launched on startup.  Each pool should be assigned a unique ID (property name, used for logging), and the value should be a sub-object with configuration parameters for the pool.  Example:
 
@@ -358,6 +360,7 @@ In this simple example we're exporting three functions, `startup()`, `handler()`
 | `handler()` | **Yes** | Called once per request, with [args](#args) and a callback.  See [Handling Requests](#handling-requests) below. |
 | `startup()` | No | Called once upon worker startup, and passed the [Worker](#worker) object.  See [Startup and Shutdown](#startup-and-shutdown) below. |
 | `shutdown()` | No | Called once when worker is shutting down.  See [Startup and Shutdown](#startup-and-shutdown) below. |
+| `emergencyShutdown()` | No | Called in the event of an uncaught exception.  See [Uncaught Exceptions](#uncaught-exceptions) below. |
 | `custom()` | No | Called for each custom request, also with [args](#args) and a callback.  See [Sending Custom Requests](#sending-custom-requests) below. |
 | `message()` | No | Called when worker receives a custom message.  See [Sending Custom Pool Messages](#sending-custom-pool-messages) below. |
 | `maint()` | No | Called when worker needs to perform maintenance.  See [Rolling Maintenance Sweeps](#rolling-maintenance-sweeps) below. |
@@ -955,6 +958,36 @@ This code snippet runs in the parent (web server) process, and assumes you have 
 So here we're using [WorkerPool.on()](#workerpoolon) to register an event listener for the [message](#message) event.  Note that it is passed a single object which contains both the PID of the worker process which sent the message, and the raw message object itself (user-defined).
 
 The PID can be useful because you can pass it to [WorkerPool.getWorker()](#workerpoolgetworker) to retrieve the actual worker object itself.
+
+## Uncaught Exceptions
+
+You can opt-in to allow the [uncatch](https://www.npmjs.com/package/uncatch) module to manage uncaught exceptions for you.  This is done by setting the global `uncatch` configuration property to `true`, and will cause the pooler to register its own listener that shuts down all pools and all workers on any uncaught exception.
+
+The idea with [uncatch](https://www.npmjs.com/package/uncatch) is that multiple modules can all register listeners, and that includes your application code.  Example:
+
+```js
+// in main web server process
+require('uncatch').on('uncaughtException', function(err) {
+	// run your own sync shutdown code here
+	// do not call process.exit
+});
+```
+
+On an uncaught exception, this code would run *in addition to* the pooler performing its own emergency shutdown routine.  Uncatch then emits the error and stack trace to STDERR and calls `process.exit(1)` after all listeners have executed.
+
+When the feature is enabled, Uncatch is propagated to your child worker code as well.  On the child side, uncaught exceptions will trigger an `emergencyShutdown()` method call if exported from your worker script.  Example:
+
+```js
+// in my_worker.js
+exports.emergencyShutdown = function(err) {
+	// emergency crash, perform last second operations
+	// do not call process.exit here
+};
+```
+
+There are two cases where `emergencyShutdown()` would be called: An uncaught exception in the child, and also an uncaught exception in the parent.  For the latter, the worker children are all sent a `SIGTERM` signal, which is caught and `emergencyShutdown()` is also invoked, just prior to the child exiting.  You can tell which one happened by looking at the `Error` object passed to `emergencyShutdown()`.  For a termination signal due to parent crash, the error `code` property will be set to the string `SIGTERM`.  Otherwise, the error object is the raw uncaught exception from the child.
+
+Note that if you enable the `uncatch` feature but do not export an `emergencyShutdown()` method in your worker script, your regular `shutdown()` method is called.  If neither method is exported then the process simply exits.
 
 ## Events
 
