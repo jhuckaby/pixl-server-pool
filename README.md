@@ -537,7 +537,7 @@ This will be sent back to the client as an `HTTP 500 Internal Server Error`, wit
 
 #### Performance Tracking
 
-If you want to track application performance in your workers, a [pixl-perf](https://www.npmjs.com/package/pixl-perf)) instance is made available to your handler function, in `args.perf`.  Metrics from this performance object are sent back to the main web server process, where they are logged (if [transaction logging](https://www.npmjs.com/package/pixl-server-web#logging) is enabled) and also exposed in the [getStats() API](https://www.npmjs.com/package/pixl-server-web#stats).
+If you want to track application performance in your workers, a [pixl-perf](https://www.npmjs.com/package/pixl-perf) instance is made available to your handler function, in `args.perf`.  Metrics from this performance object are sent back to the main web server process, where they are logged (if [transaction logging](https://www.npmjs.com/package/pixl-server-web#logging) is enabled) and also exposed in the [getStats() API](https://www.npmjs.com/package/pixl-server-web#stats).
 
 You can track metrics directly on the `args.perf` object like this:
 
@@ -842,7 +842,7 @@ exports.custom = function(args, callback) {
 };
 ```
 
-As you can see, `args.params` contains everything passed in the `user_req` object demonstrated above.  See [Custom Request Args](#custom-request-args) for a list of everything available in `args.  After completing your custom work, fire the callback with an `Error` if one occurred (or `null`/`false` if not) and a custom user-defined response object, which will be passed back to the calling code in the parent web process.  Your user-defined response object must also be able to survive serialization to/from JSON.  So please use only JavaScript primitives, like objects, arrays, strings, numbers and/or booleans.
+As you can see, `args.params` contains everything passed in the `user_req` object demonstrated above.  See [Custom Request Args](#custom-request-args) for a list of everything available in `args`.  After completing your custom work, fire the callback with an `Error` if one occurred (or `null`/`false` if not) and a custom user-defined response object, which will be passed back to the calling code in the parent web process.  Your user-defined response object must also be able to survive serialization to/from JSON.  So please use only JavaScript primitives, like objects, arrays, strings, numbers and/or booleans.
 
 Please note that custom requests still count against the worker's [Max Requests Per Child](#max-requests-per-child), and the pooler still honors things like [Max Concurrent Requests](#max-concurrent-requests).  A single worker is still chosen from the pool using the [Worker Selection Algorithm](#worker-selection-algorithm), and only idle workers (those not starting up, shutting down or in maintenance mode) are picked.  The only real difference here is that a custom request isn't HTTP specific -- it is 100% user defined, in both the request and the response.
 
