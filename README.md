@@ -1360,7 +1360,7 @@ The `HTTP 504 Gateway Timeout` error is sent back to clients if a worker takes t
 
 ## Logging
 
-The pooler uses the logging system built into [pixl-server](https://www.npmjs.com/package/pixl-server-pool).  The `component` column will be set to either `PoolManager` or `Pool-[ID]` (where `[ID]` is the ID of your worker pool).  Most debug messages are pool-specific.
+The pooler uses the logging system built into [pixl-server](https://www.npmjs.com/package/pixl-server#logging).  The `component` column will be set to either `PoolManager` or `Pool-[ID]` (where `[ID]` is the ID of your worker pool).  Most debug messages are pool-specific.
 
 Here is an example log excerpt showing a typical startup with one pool (`TestPool`) and 2 workers.  In all these log examples the first 3 columns (`hires_epoch`, `date` and `hostname`) are omitted for display purposes.  The columns shown are `component`, `category`, `code`, `msg`, and `data`.
 
