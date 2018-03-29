@@ -1,5 +1,5 @@
 // pixl-server-pool - Worker Pool Manager
-// Copyright (c) 2017 Joseph Huckaby
+// Copyright (c) 2017 - 2018 Joseph Huckaby
 // Released under the MIT License
 
 var async = require('async');
@@ -88,6 +88,9 @@ module.exports = Class.create({
 	
 	createPool: function(pool_key, pool_config, callback) {
 		// create new pool on-demand
+		if (!this.worker_pools) {
+			return callback( new Error("Pool system is uninitialized (trying to create pool before startup)") );
+		}
 		if (this.getPool(pool_key)) {
 			return callback( new Error("Cannot add Pool: Key already in use: " + pool_key) );
 		}
@@ -131,6 +134,7 @@ module.exports = Class.create({
 	
 	getPool: function(pool_key) {
 		// get direct access to pool given its key
+		if (!this.worker_pools) return null;
 		return this.worker_pools[pool_key];
 	},
 	
@@ -159,6 +163,7 @@ module.exports = Class.create({
 	shutdown: function(callback) {
 		// shut down all workers in all pools
 		var self = this;
+		if (!this.worker_pools) return callback();
 		var pool_keys = Object.keys(this.worker_pools);
 		this.logDebug(3, "Worker Pool Manager shutting down");
 		
@@ -176,6 +181,7 @@ module.exports = Class.create({
 	emergencyShutdown: function(signal) {
 		// kill all children as soon as possible (crash, etc.)
 		if (!signal) signal = 'SIGTERM';
+		if (!this.worker_pools) return null;
 		this.logDebug(1, "Emergency shutdown, killing all children");
 		
 		for (var pool_key in this.worker_pools) {
