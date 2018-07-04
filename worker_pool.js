@@ -110,7 +110,7 @@ module.exports = Class.create({
 		// delegate web request to one of our children
 		if (this.config.max_concurrent_requests && (this.num_active_requests >= this.config.max_concurrent_requests)) {
 			var msg = "Pool " + this.config.id + " is serving maximum of " + this.config.max_concurrent_requests + " concurrent requests.";
-			this.logError(429, msg);
+			this.logError( 429, msg, args.request ? { ips: args.ips, uri: args.request.url, headers: args.request.headers } : null );
 			
 			return callback(
 				"429 Too Many Requests", 
@@ -141,7 +141,7 @@ module.exports = Class.create({
 		if (!chosen_few.length) {
 			// this should never happen
 			var msg = "Pool " + this.config.id + " has no workers available to service requests.";
-			this.logError(503, msg);
+			this.logError( 503, msg, args.request ? { ips: args.ips, uri: args.request.url, headers: args.request.headers } : null );
 			
 			return callback(
 				"503 Service Unavailable", 

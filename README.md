@@ -203,14 +203,14 @@ Here is the complete list of available properties for your pool definitions:
 |---------------|---------------|-------------|
 | `enabled` | `true` | Enable or disable the pool (defaults to enabled). |
 | `script` | `''` | Path to your worker script (see [Writing Workers](#writing-workers)). |
-| `min_children` | `1` | Minimum number of workers to allow (see [Auto-Scaling](#auto-scaling). |
-| `max_children` | `1` | Maximum number of workers to allow (see [Auto-Scaling](#auto-scaling). |
+| `min_children` | `1` | Minimum number of workers to allow (see [Auto-Scaling](#auto-scaling)). |
+| `max_children` | `1` | Maximum number of workers to allow (see [Auto-Scaling](#auto-scaling)). |
 | `max_concurrent_requests` | `0` | Maximum number of concurrent requests to allow (total across all workers, see [Max Concurrent Requests](#max-concurrent-requests)). |
 | `max_requests_per_child` | `0` | Maximum number of requests a worker can serve before it is cycled out (see [Max Requests Per Child](#max-requests-per-child)). |
 | `max_concurrent_launches` | `1` | Maximum number of concurrent children to launch (for both startup and auto-scaling). |
 | `max_concurrent_maint` | `1` | Maximum number of concurrent children to allow in a maintenance state (see [Rolling Maintenance Sweeps](#rolling-maintenance-sweeps)). |
 | `child_headroom_pct` | `0` | Percentage of workers to over-allocate, for scaling purposes (see [Child Headroom](#child-headroom). |
-| `child_busy_factor` | `1` | Number of concurrent requests served by one child to consider it to be "busy" (see [Auto-Scaling](#auto-scaling). |
+| `child_busy_factor` | `1` | Number of concurrent requests served by one child to consider it to be "busy" (see [Auto-Scaling](#auto-scaling)). |
 | `startup_timeout_sec` | `0` | Maximum time allowed for workers to start up.  If exceeded the process is killed and an error logged. |
 | `shutdown_timeout_sec` | `10` | Maximum time allowed for workers to shut down.  If exceeded a SIGKILL is sent and an error logged. |
 | `request_timeout_sec` | `0` | Maximum execution time allowed per worker request.  If exceeded a [HTTP 504](#http-504-gateway-timeout) is sent. |
@@ -915,7 +915,7 @@ Again, notice that there is no callback here.  Messages are one-way deals.  That
 
 Please note that messages do not care what state the worker is in.  Even if the child is in the middle of maintenance, or startup or shutdown, the message will still be sent, and the worker's `message()` function will be called, as soon as the Node.js event loop has an available thread in the child process.  You can, of course, choose to ignore the message or delay acting on it in your own code.
 
-Custom messages also do not count against the [Max Requests Per Child](#max-requests-per-child) counter, and [Max Concurrent Requests](#max-concurrent-requests) is ignored entirely as sell.
+Custom messages also do not count against the [Max Requests Per Child](#max-requests-per-child) counter, and [Max Concurrent Requests](#max-concurrent-requests) is ignored entirely as well.
 
 ### Custom Worker-Sent Messages
 
