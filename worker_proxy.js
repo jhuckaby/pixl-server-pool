@@ -148,7 +148,7 @@ module.exports = Class.create({
 			var err_msg = Tools.getErrorDescription(err);
 			self.logError("child", "Child process error: " + err_msg);
 			self.abortAllRequests("Child Process Error: " + err_msg);
-			self.pool.notifyWorkerExit( self );
+			self.pool.notifyWorkerExit( self, 1 );
 			
 			// cancel timers if applicable
 			if (self.startup_timer) {
@@ -177,7 +177,7 @@ module.exports = Class.create({
 			self.child_exited = true;
 			self.logDebug(4, "Child " + self.pid + " exited with code: " + (code || signal || 0));
 			self.abortAllRequests("Child Process Exited: " + (code || signal || 0));
-			self.pool.notifyWorkerExit( self );
+			self.pool.notifyWorkerExit( self, code );
 			
 			// cancel timers if applicable
 			if (self.startup_timer) {
@@ -369,7 +369,7 @@ module.exports = Class.create({
 			
 			case 'message':
 				// custom message from child, emit as event
-				this.logDebug(9, "Received custom message from child: " + this.pid, data.data);
+				this.logDebug(10, "Received custom message from child: " + this.pid, data.data);
 				data.pid = this.pid;
 				this.emit('message', data);
 				this.pool.emit('message', data);

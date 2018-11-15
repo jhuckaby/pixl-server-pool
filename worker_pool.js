@@ -64,7 +64,7 @@ module.exports = Class.create({
 	startup: function(callback) {
 		// start initial workers
 		var self = this;
-		this.logDebug(2, "Starting up pool", this.config);
+		this.logDebug(2, "Starting up pool");
 		
 		async.timesLimit( this.config.min_children, this.config.max_concurrent_launches,
 			function(idx, callback) {
@@ -302,7 +302,7 @@ module.exports = Class.create({
 				} // max_requests_per_child
 				
 				// rolling restart request
-				if ((worker.state == 'active') && worker.request_restart && (states.active > 1)) {
+				if ((worker.state == 'active') && worker.request_restart && ((states.active > 1) || (this.config.max_children == 1))) {
 					delete worker.request_restart;
 					this.logDebug(3, "Restarting worker " + worker.pid + " upon request");
 					worker.shutdown();
@@ -371,11 +371,14 @@ module.exports = Class.create({
 		}
 	},
 	
-	notifyWorkerExit: function(worker) {
+	notifyWorkerExit: function(worker, code) {
 		// receive notification that a worker process exited
 		this.logDebug(4, "Worker " + worker.pid +  " has been removed from the pool");
 		delete this.workers[ worker.pid ];
 		this.notifyWorkerStateChange(worker);
+		
+		// emit event if child crashed
+		if (code) this.emit('crash', { pid: worker.pid, code: code });
 	},
 	
 	shutdown: function(callback) {

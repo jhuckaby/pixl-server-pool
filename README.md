@@ -19,8 +19,7 @@ Worker pools can have a fixed number of workers, or grow/shrink automatically ba
 
 ## Table of Contents
 
-- [Overview](#overview)
-	* [Features](#features)
+<!-- toc -->
 - [Usage](#usage)
 	* [Configuration](#configuration)
 	* [Delegating Requests](#delegating-requests)
@@ -59,6 +58,9 @@ Worker pools can have a fixed number of workers, or grow/shrink automatically ba
 	* [API](#api)
 		+ [PoolManager](#poolmanager)
 			- [PoolManager.getPool](#poolmanagergetpool)
+			- [PoolManager.getPools](#poolmanagergetpools)
+			- [PoolManager.createPool](#poolmanagercreatepool)
+			- [PoolManager.removePool](#poolmanagerremovepool)
 		+ [WorkerPool](#workerpool)
 			- [WorkerPool.delegateRequest](#workerpooldelegaterequest)
 			- [WorkerPool.delegateCustom](#workerpooldelegatecustom)
@@ -803,7 +805,7 @@ Custom requests offer the ability for you to send a completely user-defined requ
 
 One potential use of custom requests is to handle most of your application logic in the parent web process, i.e. parse the HTTP request, perform things like authentication, database queries, etc., but then delegate a smaller side task to a worker pool.  For example, a CPU-hard image transformation, or some operation that requires process-level parallelization.  Then, handle the HTTP response back in the parent process.
 
-Here is an example.  This code snippet runs in the parent (web server) process, and assumes you have a `pool` variable in scope, which was attained by calling [PoolManager.getPool()](#poolmanagergetpool).
+Here is an example.  This code snippet runs in the parent (web server) process, and assumes you have a `pool` variable in scope, which was obtained by calling [PoolManager.getPool()](#poolmanagergetpool).
 
 ```js
 // in main web server process
@@ -896,7 +898,7 @@ To broadcast a custom message to all pool workers, use the [WorkerPool.sendMessa
 pool.sendMessage({ myKey1: 12345, myKey2: "Custom!" });
 ```
 
-This code snippet runs in the parent (web server) process, and assumes you have a `pool` variable in scope, which was attained by calling [PoolManager.getPool()](#poolmanagergetpool).
+This code snippet runs in the parent (web server) process, and assumes you have a `pool` variable in scope, which was obtained by calling [PoolManager.getPool()](#poolmanagergetpool).
 
 You can pass any user-defined object as the message, as long as it is able to survive serialization to/from JSON.  So please use only JavaScript primitives, like objects, arrays, strings, numbers and/or booleans.  Note that there is no callback here (messages are fire-and-forget).
 
@@ -953,7 +955,7 @@ pool.on('message', function(message) {
 });
 ```
 
-This code snippet runs in the parent (web server) process, and assumes you have a `pool` variable in scope, which was attained by calling [PoolManager.getPool()](#poolmanagergetpool).
+This code snippet runs in the parent (web server) process, and assumes you have a `pool` variable in scope, which was obtained by calling [PoolManager.getPool()](#poolmanagergetpool).
 
 So here we're using [WorkerPool.on()](#workerpoolon) to register an event listener for the [message](#message) event.  Note that it is passed a single object which contains both the PID of the worker process which sent the message, and the raw message object itself (user-defined).
 
@@ -1066,6 +1068,47 @@ var pool = server.PoolManager.getPool('MyTestPool1');
 
 This code snippet assumes your [pixl-server](https://npmjs.com/package/pixl-server) instance is in scope and named `server`.
 
+#### PoolManager.getPools
+
+The `getPools()` method retrieves all the current active [WorkerPool](#workerpool) objects in a hash, keyed by their pool IDs.  Example:
+
+```js
+// in main web server process
+var pools = server.PoolManager.getPools();
+var pool = pools['MyTestPool1'];
+```
+
+#### PoolManager.createPool
+
+The `createPool()` method allows you to dynamically create a new [WorkerPool](#workerpool) at runtime.  This is an advanced method and should only be used if you know exactly what you are doing.  The method accepts an ID (string), a configuration object for the new pool, and a callback to fire once all workers are launched and ready.  The method also returns the new [WorkerPool](#workerpool) object.  Example use:
+
+```js
+// in main web server process
+var config = {
+	"script": "my_new_worker.js",
+	"min_children": 1,
+	"max_children": 2
+};
+var pool = server.PoolManager.createPool( 'MyNewPool', config, function(err) {
+	if (err) throw err;
+	// if no error then pool has started up successfully and is ready to work
+} );
+```
+
+This would dynamically add a new worker pool with ID `MyNewPool`, and immediately launch 1 child (i.e. `min_children`).  The callback would fire once the child was started up and ready to receive requests.
+
+#### PoolManager.removePool
+
+The `removePool()` method shuts down and removes a [WorkerPool](#workerpool) at runtime.  This is an advanced method and should only be used if you know exactly what you are doing.  It should only be used to remove pools that you yourself added via [PoolManager.createPool()](#poolmanagercreatepool), i.e. do not use this to remove any startup pools in the main configuration file.  The method accepts a Pool ID (string), and a callback which is fired once the pool and all workers are completely shut down.  Example:
+
+```js
+// in main web server process
+server.PoolManager.removePool( 'MyNewPool', function(err) {
+	if (err) throw err;
+	// if no error then pool is completely shut down and removed
+});
+```
+
 ### WorkerPool
 
 The `WorkerPool` class represents one pool of workers.  It can be retrieved by calling [PoolManager.getPool()](#poolmanagergetpool).
@@ -1109,7 +1152,7 @@ pool.delegateCustom( { custom1: 12345, custom2: "Hello" }, function(err, user_re
 } );
 ```
 
-This code snippet assumes you have a `pool` variable in scope, which was attained by calling [PoolManager.getPool()](#poolmanagergetpool).
+This code snippet assumes you have a `pool` variable in scope, which was obtained by calling [PoolManager.getPool()](#poolmanagergetpool).
 
 See [Sending Custom Requests](#sending-custom-requests) for more details.
 
@@ -1122,7 +1165,7 @@ The `WorkerPool.sendMessage()` method broadcasts a custom message to *all* worke
 pool.sendMessage({ myKey1: 12345, myKey2: "Custom!" });
 ```
 
-This code snippet assumes you have a `pool` variable in scope, which was attained by calling [PoolManager.getPool()](#poolmanagergetpool).
+This code snippet assumes you have a `pool` variable in scope, which was obtained by calling [PoolManager.getPool()](#poolmanagergetpool).
 
 See [Sending Custom Pool Messages](#sending-custom-pool-messages) for more details.
 
@@ -1142,7 +1185,7 @@ You can optionally pass in custom user-defined object, which is sent all the way
 pool.requestMaint({ myKey1: 12345, myKey2: "Maint!" });
 ```
 
-These code snippets assume you have a `pool` variable in scope, which was attained by calling [PoolManager.getPool()](#poolmanagergetpool).
+These code snippets assume you have a `pool` variable in scope, which was obtained by calling [PoolManager.getPool()](#poolmanagergetpool).
 
 Note that if you only have one active worker child, this call has no effect.  The system will only send children into maintenance mode if there are more available to service requests.
 
@@ -1157,7 +1200,7 @@ The `WorkerPool.requestRestart()` method requests a rolling restart of all worke
 pool.requestRestart();
 ```
 
-This code snippet assumes you have a `pool` variable in scope, which was attained by calling [PoolManager.getPool()](#poolmanagergetpool).
+This code snippet assumes you have a `pool` variable in scope, which was obtained by calling [PoolManager.getPool()](#poolmanagergetpool).
 
 Note that if you only have one active worker child, this call has no effect.  The system will only restart children if there are more available to service requests.
 
@@ -1172,7 +1215,7 @@ The `WorkerPool.getWorkers` method returns an object containing all current work
 var workers = pool.getWorkers();
 ```
 
-This code snippet assumes you have a `pool` variable in scope, which was attained by calling [PoolManager.getPool()](#poolmanagergetpool).
+This code snippet assumes you have a `pool` variable in scope, which was obtained by calling [PoolManager.getPool()](#poolmanagergetpool).
 
 #### WorkerPool.getWorker
 
@@ -1183,7 +1226,7 @@ The `WorkerPool.getWorker()` method fetches a single worker from the pool, given
 var worker = pool.getWorker( 1234 ); // pid
 ```
 
-This code snippet assumes you have a `pool` variable in scope, which was attained by calling [PoolManager.getPool()](#poolmanagergetpool).
+This code snippet assumes you have a `pool` variable in scope, which was obtained by calling [PoolManager.getPool()](#poolmanagergetpool).
 
 #### WorkerPool.on
 
@@ -1197,7 +1240,7 @@ pool.on('maint', function(worker) {
 });
 ```
 
-This code snippet assumes you have a `pool` variable in scope, which was attained by calling [PoolManager.getPool()](#poolmanagergetpool).
+This code snippet assumes you have a `pool` variable in scope, which was obtained by calling [PoolManager.getPool()](#poolmanagergetpool).
 
 See [Events](#events) for a list of all available events you can listen for.
 
@@ -1245,7 +1288,7 @@ worker.delegateCustom( { custom1: 12345, custom2: "Hello" }, function(err, user_
 } );
 ```
 
-This code snippet assumes you have a `pool` variable in scope, which was attained by calling [PoolManager.getPool()](#poolmanagergetpool).
+This code snippet assumes you have a `pool` variable in scope, which was obtained by calling [PoolManager.getPool()](#poolmanagergetpool).
 
 #### WorkerProxy.sendMessage
 
@@ -1257,7 +1300,7 @@ var worker = pool.getWorker( 1234 ); // PID
 worker.sendMessage({ myKey1: 12345, myKey2: "Custom!" });
 ```
 
-This code snippet assumes you have a `pool` variable in scope, which was attained by calling [PoolManager.getPool()](#poolmanagergetpool).
+This code snippet assumes you have a `pool` variable in scope, which was obtained by calling [PoolManager.getPool()](#poolmanagergetpool).
 
 #### WorkerProxy.shutdown
 
@@ -1517,9 +1560,9 @@ If you have [http_log_requests](https://www.npmjs.com/package/pixl-server-web#ht
 
 # License
 
-The MIT License (MIT)
+**The MIT License (MIT)**
 
-Copyright (c) 2017 Joseph Huckaby.
+*Copyright (c) 2017 - 2018 Joseph Huckaby.*
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

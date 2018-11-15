@@ -37,7 +37,7 @@ module.exports = Class.create({
 			
 			require('uncatch').on('uncaughtException', function(err) {
 				self.logger.set('sync', true);
-				self.logDebug(1, "Uncaught Exception: " + err);
+				self.logDebug(1, "Uncaught Exception: " + err, err.stack);
 				self.emergencyShutdown();
 			});
 		}
@@ -113,6 +113,7 @@ module.exports = Class.create({
 		} // uri_match
 		
 		pool.startup( callback );
+		return pool;
 	},
 	
 	removePool: function(pool_key, callback) {
@@ -136,6 +137,11 @@ module.exports = Class.create({
 		// get direct access to pool given its key
 		if (!this.worker_pools) return null;
 		return this.worker_pools[pool_key];
+	},
+	
+	getPools: function() {
+		// get all pools
+		return this.worker_pools;
 	},
 	
 	_uniqueIDCounter: 0,
