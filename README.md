@@ -223,6 +223,18 @@ Here is the complete list of available properties for your pool definitions:
 | `maint_time_sec` | `0` | When `maint_method` is set to `time` this specifies the number of seconds between maintenance sweeps (tracked per worker). |
 | `uri_match` | `''` | Optionally route all incoming web requests matching URI to worker pool (see [Delegating Requests](#delegating-requests)). |
 | `acl` | `false` | Used in conjunction with `uri_match`, optionally enable [ACL restrictions](https://npmjs.com/package/pixl-server-web#access-control-lists) for routed requests. |
+| `exec_opts` | n/a | Optionally override child spawn options such as `uid` and `gid`.  See [Child Spawn Options](#child-spawn-options). |
+
+### Child Spawn Options
+
+If you specify an `exec_opts` object in your pool configuration, you can set properties that are passed directly to the [child_process.spawn()](https://nodejs.org/api/child_process.html#child_process_child_process_spawn_command_args_options) call in Node.js.  Using this you can set the User ID (UID) and/or Group ID (GID) of your worker processes.  Example:
+
+```js
+"exec_opts": {
+	"uid": 99,
+	"gid": 99
+}
+```
 
 ## Delegating Requests
 
