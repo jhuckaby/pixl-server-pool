@@ -412,14 +412,15 @@ module.exports = Class.create({
 			break;
 			
 			case 'json':
+				var json_raw = (args.query && args.query.pretty) ? JSON.stringify(body, null, "\t") : JSON.stringify(body);
 				if (args.query && args.query.callback) {
 					// JSONP
-					body = args.query.callback + '(' + JSON.stringify(body) + ");\n";
+					body = args.query.callback + '(' + json_raw + ");\n";
 					if (!data.headers['Content-Type']) data.headers['Content-Type'] = "text/javascript";
 				}
 				else {
 					// pure JSON
-					body = JSON.stringify(body);
+					body = json_raw;
 					if (!data.headers['Content-Type']) data.headers['Content-Type'] = "application/json";
 				}
 			break;
