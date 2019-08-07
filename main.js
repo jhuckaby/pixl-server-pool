@@ -195,7 +195,8 @@ module.exports = Class.create({
 			var workers = pool.getWorkers();
 			for (var pid in workers) {
 				this.logDebug(2, "Killing " + pool_key + " PID " + pid + " with signal " + signal);
-				process.kill( pid, signal );
+				try { process.kill( pid, signal ); }
+				catch(e) {;}
 			}
 		}
 	}
