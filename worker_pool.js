@@ -7,7 +7,7 @@ var Class = require("pixl-class");
 var Tools = require("pixl-tools");
 var Perf = require("pixl-perf");
 
-var WorkerProxy = require('./worker_proxy.js');
+var DefaultWorkerProxy = require('./worker_proxy.js');
 
 module.exports = Class.create({
 	// WorkerPool represents one group of workers
@@ -81,6 +81,7 @@ module.exports = Class.create({
 	addWorker: function(callback) {
 		// add new worker to pool
 		var self = this;
+		var WorkerProxy = this.config.WorkerProxy || DefaultWorkerProxy;
 		var worker = new WorkerProxy( this.config, this );
 		
 		worker.startup( function(err) {
@@ -90,8 +91,10 @@ module.exports = Class.create({
 			if (callback) callback(err);
 		} );
 		
-		this.workers[ worker.pid ] = worker;
-		this.notifyWorkerStateChange(worker);
+		if (worker.pid) {
+			this.workers[ worker.pid ] = worker;
+			this.notifyWorkerStateChange(worker);
+		}
 		
 		return worker;
 	},
@@ -229,6 +232,7 @@ module.exports = Class.create({
 		
 		// make sure only N children do maint concurrently
 		var states = this.getStates();
+		// this.logDebug(10, "Workers", { pids: Object.keys(this.workers), states: states });
 		
 		// find worker to focus on (new worker each time, then loop around)
 		var worker = null;
@@ -343,7 +347,7 @@ module.exports = Class.create({
 			// need more workers
 			this.logDebug(4, "Auto-Scale: Adding worker to pool", { num_busy: num_busy });
 			var worker = this.addWorker();
-			this.emit('autoscale', { cmd: 'add', pid: worker.pid });
+			if (worker.pid) this.emit('autoscale', { cmd: 'add', pid: worker.pid });
 		}
 		else if ((num_busy_adj < states.active - 1) && (states.active > 1) && (total_children > this.config.min_children)) {
 			// need fewer workers
@@ -393,7 +397,10 @@ module.exports = Class.create({
 		// wait for all workers to exit
 		async.whilst(
 			function() { return !!Object.keys(self.workers).length; },
-			function(callback) { setTimeout( callback, 100 ); },
+			function(callback) { 
+				// self.logDebug(10, "Waiting for workers", Object.keys(self.workers));
+				setTimeout( callback, 100 ); 
+			},
 			function() {
 				self.logDebug(2, "All workers exited, pool shutdown complete");
 				callback();
