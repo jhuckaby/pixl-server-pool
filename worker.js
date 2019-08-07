@@ -74,7 +74,7 @@ var worker = {
 		var self = this;
 		
 		// optionally gzip text content in the worker
-		this.gzipEnabled = this.config.gzip_worker || false;
+		this.gzipEnabled = this.config.gzip_child || false;
 		this.gzipOpts = this.config.gzip_opts || { level: zlib.Z_DEFAULT_COMPRESSION, memLevel: 8 };
 		this.gzipRegex = new RegExp( this.config.gzip_regex || '.+', "i" );
 		
