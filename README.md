@@ -22,6 +22,8 @@ Worker pools can have a fixed number of workers, or grow/shrink automatically ba
 <!-- toc -->
 - [Usage](#usage)
 	* [Configuration](#configuration)
+		+ [Child Spawn Options](#child-spawn-options)
+		+ [Child Gzip Encoding](#child-gzip-encoding)
 	* [Delegating Requests](#delegating-requests)
 		+ [Automatic URI-Based Routing](#automatic-uri-based-routing)
 		+ [Manual Request Routing](#manual-request-routing)
@@ -224,6 +226,9 @@ Here is the complete list of available properties for your pool definitions:
 | `uri_match` | `''` | Optionally route all incoming web requests matching URI to worker pool (see [Delegating Requests](#delegating-requests)). |
 | `acl` | `false` | Used in conjunction with `uri_match`, optionally enable [ACL restrictions](https://npmjs.com/package/pixl-server-web#access-control-lists) for routed requests. |
 | `exec_opts` | n/a | Optionally override child spawn options such as `uid` and `gid`.  See [Child Spawn Options](#child-spawn-options). |
+| `gzip_child` | `false` | Optionally enable Gzip encoding in the worker processes.  See [Child Gzip Encoding](#child-gzip-encoding). |
+| `gzip_opts` | n/a | Optionally override the default Gzip compression settings.  See [Child Gzip Encoding](#child-gzip-encoding). |
+| `gzip_regex` | `.+` | Optionally limit which `Content-Type` values will be Gzip-encoded.  See [Child Gzip Encoding](#child-gzip-encoding). |
 
 ### Child Spawn Options
 
@@ -235,6 +240,61 @@ If you specify an `exec_opts` object in your pool configuration, you can set pro
 	"gid": 99
 }
 ```
+
+### Child Gzip Encoding
+
+Normally, all Gzip content encoding happens at the web browser level, i.e. in [pixl-server-web](https://github.com/jhuckaby/pixl-server-web).  However, the web server runs in the parent process, and thus it may become a CPU bottleneck for high traffic applications where all responses are compressed.  To solve this, you can opt to have all Gzip encoding happen in the *worker processes* instead.  This effectively allows the compression to be parallelized across CPU cores.  To enable this feature, set the `gzip_child` property to `true` in your pool configuration:
+
+```js
+"MyTestPool1": {
+	"script": "my_worker.js",
+	"uri_match": "^/pool1",
+	"gzip_child": true
+}
+```
+
+This will encode all pool [text responses](#text-responses) sent back by your child worker handler code, if and only if the following criteria are met:
+
+- The HTTP response code is 200.
+- The response body is text-based (i.e. not binary, and not a file), and has a non-zero length.
+- The client request included an `Accept-Encoding` header, and it contains `gzip` (case-insensitive).
+- The response `Content-Type` matches the regular expression in `gzip_regex` (defaults to all).
+- The response payload isn't already encoded (compressed) by your worker code.
+
+You can also optionally control the [Gzip Compression Flags](https://nodejs.org/api/zlib.html#zlib_class_options) by setting the `gzip_opts` property:
+
+```js
+"MyTestPool1": {
+	"script": "my_worker.js",
+	"uri_match": "^/pool1",
+	
+	"gzip_child": true,
+	"gzip_opts": {
+		level: 6,
+		memLevel: 8
+	}
+}
+```
+
+Omit this to accept the default settings, which is compression level 6, and memory level 8.  See [Gzip Compression Flags](https://nodejs.org/api/zlib.html#zlib_class_options) for more on these settings.
+
+Finally, you can control exactly which response types are compressed by setting the `gzip_regex` property.  This is matched against your `Content-Type` response headers, so you can limit Gzip encoding to certain response types, e.g. `text/`.
+
+```js
+"MyTestPool1": {
+	"script": "my_worker.js",
+	"uri_match": "^/pool1",
+	
+	"gzip_child": true,
+	"gzip_regex": "^text\\/"
+}
+```
+
+If `gzip_regex` is omitted, it defaults to *all* content types.
+
+It should be noted that compressing responses in the child worker processes has trade-offs, and it is only a net performance win for payloads within a certain size range.  This is because the child / parent communication is JSON over STDIO, so the Gzip-encoded payload has to be converted to [Base64](https://en.wikipedia.org/wiki/Base64), serialized to JSON, sent over STDIO to the parent, parsed, then converted back to binary again.  So for this to be effective, your uncompressed payloads should be smaller than 1MB or so.  This also depends on CPU architecture and server hardware specs, as well as your specific application traffic and payloads.
+
+For these reasons, child Gzip encoding is disabled by default.  It is recommended that you only enable it if you know exactly what you are doing.
 
 ## Delegating Requests
 
