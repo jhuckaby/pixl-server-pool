@@ -4,6 +4,7 @@
 // Released under the MIT License
 
 var Path = require('path');
+var zlib = require('zlib');
 var JSONStream = require("pixl-json-stream");
 var Perf = require("pixl-perf");
 
@@ -71,6 +72,11 @@ var worker = {
 	startup: function() {
 		// load user code and allow it to startup async
 		var self = this;
+		
+		// optionally gzip text content in the worker
+		this.gzipEnabled = this.config.gzip_worker || false;
+		this.gzipOpts = this.config.gzip_opts || { level: zlib.Z_DEFAULT_COMPRESSION, memLevel: 8 };
+		this.gzipRegex = new RegExp( this.config.gzip_regex || '.+', "i" );
 		
 		// optionally listen for uncaught exceptions and shutdown
 		if (this.server.uncatch) {
@@ -144,6 +150,24 @@ var worker = {
 			}
 		} // request cmd
 		
+		// finish response and send to stdio pipe
+		var finishResponse = function() {
+			// copy perf metrics over to res
+			if (!res.perf) res.perf = req.perf.metrics();
+			
+			// send response to parent
+			self.sendCommand('response', res);
+			
+			// done with this request
+			self.num_active_requests--;
+			
+			// if we're idle now, check for pending maint / shutdown requests
+			if (!self.num_active_requests) {
+				if (self.request_shutdown) self.shutdown();
+				else if (self.request_maint) self.maint(self.request_maint);
+			}
+		};
+		
 		// handle response back from user obj
 		var handleResponse = function() {
 			// check for error as solo arg
@@ -181,25 +205,62 @@ var worker = {
 					res.body = res.body.toString('base64');
 				}
 				else if (res.body && (typeof(res.body) == 'object')) {
-					res.type = 'json';
+					res.type = 'string';
+					
+					// stringify JSON here
+					var json_raw = (req.query && req.query.pretty) ? JSON.stringify(res.body, null, "\t") : JSON.stringify(res.body);
+					if (req.query && req.query.callback) {
+						// JSONP
+						res.body = req.query.callback + '(' + json_raw + ");\n";
+						if (!res.headers['Content-Type']) res.headers['Content-Type'] = "text/javascript";
+					}
+					else {
+						// pure JSON
+						res.body = json_raw;
+						if (!res.headers['Content-Type']) res.headers['Content-Type'] = "application/json";
+					}
 				}
 			}
 			
-			// copy perf metrics over to res
-			if (!res.perf) res.perf = req.perf.metrics();
-			
-			// send response to parent
-			self.sendCommand('response', res);
-			
-			// done with this request
-			self.num_active_requests--;
-			
-			// if we're idle now, check for pending maint / shutdown requests
-			if (!self.num_active_requests) {
-				if (self.request_shutdown) self.shutdown();
-				else if (self.request_maint) self.maint(self.request_maint);
+			// optional compress inside worker process
+			if (
+				self.gzipEnabled &&
+				(res.status == '200 OK') && (res.type == 'string') &&
+				res.body && res.body.length && req.headers && res.headers &&
+				!res.headers['Content-Encoding'] && 
+				(res.headers['Content-Type'] && res.headers['Content-Type'].match(self.gzipRegex)) && 
+				(req.headers['accept-encoding'] && req.headers['accept-encoding'].match(/\bgzip\b/i))
+			) 
+			{
+				// okay to gzip!
+				req.perf.begin('gzip');
+				zlib.gzip(res.body, self.gzipOpts, function(err, data) {
+					req.perf.end('gzip');
+					
+					if (err) {
+						// should never happen
+						res.status = "500 Internal Server Error";
+						res.body = "Failed to gzip compress content: " + err;
+						res.logError = {
+							code: 500,
+							msg: res.body
+						};
+					}
+					else {
+						// no error, wrap in base64 for JSON
+						res.type = 'base64';
+						res.body = data.toString('base64');
+						res.headers['Content-Encoding'] = 'gzip';
+					}
+					
+					finishResponse();
+				}); // gzip
 			}
-		};
+			else {
+				// no gzip
+				finishResponse();
+			}
+		}; // handleResponse
 		
 		// call custom URI handler, or the generic user_obj.handler()
 		if (handler) handler.callback( req, handleResponse );
