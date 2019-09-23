@@ -73,10 +73,45 @@ var worker = {
 		// load user code and allow it to startup async
 		var self = this;
 		
-		// optionally gzip text content in the worker
-		this.gzipEnabled = this.config.gzip_child || false;
-		this.gzipOpts = this.config.gzip_opts || { level: zlib.Z_DEFAULT_COMPRESSION, memLevel: 8 };
-		this.gzipRegex = new RegExp( this.config.gzip_regex || '.+', "i" );
+		// optionally compress text content in the worker
+		this.compEnabled = this.config.compress_child || this.config.gzip_child || false;
+		this.compRegex = new RegExp( this.config.compress_regex || this.config.gzip_regex || '.+', "i" );
+		this.gzipOpts = this.config.gzip_opts || {
+			level: zlib.constants.Z_DEFAULT_COMPRESSION, 
+			memLevel: 8 
+		};
+		
+		this.brotliEnabled = !!zlib.BrotliCompress && this.config.brotli_child;
+		this.brotliOpts = this.config.brotli_opts || {
+			chunkSize: 16 * 1024,
+			mode: 'text',
+			level: 4
+		};
+		
+		if (this.brotliEnabled) {
+			if ("mode" in this.brotliOpts) {
+				switch (this.brotliOpts.mode) {
+					case 'text': this.brotliOpts.mode = zlib.constants.BROTLI_MODE_TEXT; break;
+					case 'font': this.brotliOpts.mode = zlib.constants.BROTLI_MODE_FONT; break;
+					case 'generic': this.brotliOpts.mode = zlib.constants.BROTLI_MODE_GENERIC; break;
+				}
+				if (!this.brotliOpts.params) this.brotliOpts.params = {};
+				this.brotliOpts.params[ zlib.constants.BROTLI_PARAM_MODE ] = this.brotliOpts.mode;
+				delete this.brotliOpts.mode;
+			}
+			if ("level" in this.brotliOpts) {
+				if (!this.brotliOpts.params) this.brotliOpts.params = {};
+				this.brotliOpts.params[ zlib.constants.BROTLI_PARAM_QUALITY ] = this.brotliOpts.level;
+				delete this.brotliOpts.level;
+			}
+			if ("hint" in this.brotliOpts) {
+				if (!this.brotliOpts.params) this.brotliOpts.params = {};
+				this.brotliOpts.params[ zlib.constants.BROTLI_PARAM_SIZE_HINT ] = this.brotliOpts.hint;
+				delete this.brotliOpts.hint;
+			}
+		} // brotli
+		
+		this.acceptEncodingMatch = this.brotliEnabled ? /\b(gzip|deflate|br)\b/i : /\b(gzip|deflate)\b/i;
 		
 		// optionally listen for uncaught exceptions and shutdown
 		if (this.server.uncatch) {
@@ -224,23 +259,47 @@ var worker = {
 			
 			// optional compress inside worker process
 			if (
-				self.gzipEnabled &&
+				self.compEnabled &&
 				(res.status == '200 OK') && (res.type == 'string') &&
 				res.body && res.body.length && req.headers && res.headers &&
 				!res.headers['Content-Encoding'] && 
-				(res.headers['Content-Type'] && res.headers['Content-Type'].match(self.gzipRegex)) && 
-				(req.headers['accept-encoding'] && req.headers['accept-encoding'].match(/\bgzip\b/i))
+				(res.headers['Content-Type'] && res.headers['Content-Type'].match(self.compRegex)) && 
+				(req.headers['accept-encoding'] && req.headers['accept-encoding'].match(self.acceptEncodingMatch))
 			) 
 			{
-				// okay to gzip!
-				req.perf.begin('gzip');
-				zlib.gzip(res.body, self.gzipOpts, function(err, data) {
-					req.perf.end('gzip');
+				// okay to compress!
+				req.perf.begin('compress');
+				
+				var zlib_opts = null;
+				var zlib_func = '';
+				var accept_encoding = req.headers['accept-encoding'].toLowerCase();
+				
+				if (self.brotliEnabled && accept_encoding.match(/\b(br)\b/)) {
+					// prefer brotli first, if supported by Node.js
+					zlib_func = 'brotliCompress';
+					zlib_opts = self.brotliOpts || {};
+					res.headers['Content-Encoding'] = 'br';
+				}
+				else if (accept_encoding.match(/\b(gzip)\b/)) {
+					// prefer gzip second
+					zlib_func = 'gzip';
+					zlib_opts = self.gzipOpts || {};
+					res.headers['Content-Encoding'] = 'gzip';
+				}
+				else if (accept_encoding.match(/\b(deflate)\b/)) {
+					// prefer deflate third
+					zlib_func = 'deflate';
+					zlib_opts = self.gzipOpts || {}; // yes, same opts as gzip
+					res.headers['Content-Encoding'] = 'deflate';
+				}
+				
+				zlib[ zlib_func ]( res.body, zlib_opts, function(err, data) {
+					req.perf.end('compress');
 					
 					if (err) {
 						// should never happen
 						res.status = "500 Internal Server Error";
-						res.body = "Failed to gzip compress content: " + err;
+						res.body = "Failed to compress content: " + err;
 						res.logError = {
 							code: 500,
 							msg: res.body
@@ -250,14 +309,13 @@ var worker = {
 						// no error, wrap in base64 for JSON
 						res.type = 'base64';
 						res.body = data.toString('base64');
-						res.headers['Content-Encoding'] = 'gzip';
 					}
 					
 					finishResponse();
-				}); // gzip
+				}); // compress
 			}
 			else {
-				// no gzip
+				// no compress
 				finishResponse();
 			}
 		}; // handleResponse

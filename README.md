@@ -23,7 +23,7 @@ Worker pools can have a fixed number of workers, or grow/shrink automatically ba
 - [Usage](#usage)
 	* [Configuration](#configuration)
 		+ [Child Spawn Options](#child-spawn-options)
-		+ [Child Gzip Encoding](#child-gzip-encoding)
+		+ [Child Compression](#child-compression)
 	* [Delegating Requests](#delegating-requests)
 		+ [Automatic URI-Based Routing](#automatic-uri-based-routing)
 		+ [Manual Request Routing](#manual-request-routing)
@@ -241,25 +241,60 @@ If you specify an `exec_opts` object in your pool configuration, you can set pro
 }
 ```
 
-### Child Gzip Encoding
+### Child Compression
 
-Normally, all Gzip content encoding happens at the web browser level, i.e. in [pixl-server-web](https://github.com/jhuckaby/pixl-server-web).  However, the web server runs in the parent process, and thus it may become a CPU bottleneck for high traffic applications where all responses are compressed.  To solve this, you can opt to have all Gzip encoding happen in the *worker processes* instead.  This effectively allows the compression to be parallelized across CPU cores.  To enable this feature, set the `gzip_child` property to `true` in your pool configuration:
+Normally, all content compression (i.e. content encoding) happens at the web browser level, i.e. in [pixl-server-web](https://github.com/jhuckaby/pixl-server-web).  However, the web server runs in the parent process, and thus it may become a CPU bottleneck for high traffic applications where all responses are compressed.  To solve this, you can opt to have all encoding happen in the *worker processes* instead.  This effectively allows the compression to be parallelized across CPU cores.  To enable this feature, set the `compress_child` property to `true` in your pool configuration:
 
 ```js
 "MyTestPool1": {
 	"script": "my_worker.js",
 	"uri_match": "^/pool1",
-	"gzip_child": true
+	
+	"compress_child": true
 }
 ```
 
-This will encode all pool [text responses](#text-responses) sent back by your child worker handler code, if and only if the following criteria are met:
+This will encode all pool [text responses](#text-responses) sent back by your child worker handler code, if and only if all of the following criteria are met:
 
 - The HTTP response code is 200.
 - The response body is text-based (i.e. not binary, and not a file), and has a non-zero length.
-- The client request included an `Accept-Encoding` header, and it contains `gzip` (case-insensitive).
-- The response `Content-Type` matches the regular expression in `gzip_regex` (defaults to all).
+- The client request included an `Accept-Encoding` header, and it contains `gzip`, `deflate` or `br` (case-insensitive).
+- The response `Content-Type` matches the regular expression in `compress_regex` (defaults to all).
 - The response payload isn't already encoded (compressed) by your worker code.
+
+The actual compression format is decided automatically, based on the client request `Accept-Encoding` header, and our list of supported formats (`br`, `gzip`, or `deflate`, matched in that order).
+
+Note that [Brotli](https://en.wikipedia.org/wiki/Brotli) (`br`) compression is new as of Node v10.16.0, so it is disabled by default.  To enable it, please set the `brotli_child` property to `true` in your pool configuration, along with `compress_child`.  Example:
+
+```js
+"MyTestPool1": {
+	"script": "my_worker.js",
+	"uri_match": "^/pool1",
+	
+	"compress_child": true,
+	"brotli_child": true
+}
+```
+
+You can optionally configure the Brotli compression options by including a `brotli_opts` property.  Example:
+
+```js
+"MyTestPool1": {
+	"script": "my_worker.js",
+	"uri_match": "^/pool1",
+	
+	"compress_child": true,
+	"brotli_child": true,
+	"brotli_opts": {
+		"chunkSize": 16384,
+		"mode": "text",
+		"level": 4,
+		"hint": 0
+	}
+}
+```
+
+See the Node [Brotli Class Options](https://nodejs.org/api/zlib.html#zlib_class_brotlioptions) for more details on what can be set here.  Note that `mode` is a convenience shortcut for `zlib.constants.BROTLI_PARAM_MODE` (which can set to `text`, `font` or `generic`), `level` is a shortcut for `zlib.constants.BROTLI_PARAM_QUALITY`, and `hint` is a shortcut for `zlib.constants.BROTLI_PARAM_SIZE_HINT`.
 
 You can also optionally control the [Gzip Compression Flags](https://nodejs.org/api/zlib.html#zlib_class_options) by setting the `gzip_opts` property:
 
@@ -268,33 +303,35 @@ You can also optionally control the [Gzip Compression Flags](https://nodejs.org/
 	"script": "my_worker.js",
 	"uri_match": "^/pool1",
 	
-	"gzip_child": true,
+	"compress_child": true,
 	"gzip_opts": {
-		level: 6,
-		memLevel: 8
+		"level": 6,
+		"memLevel": 8
 	}
 }
 ```
 
 Omit this to accept the default settings, which is compression level 6, and memory level 8.  See [Gzip Compression Flags](https://nodejs.org/api/zlib.html#zlib_class_options) for more on these settings.
 
-Finally, you can control exactly which response types are compressed by setting the `gzip_regex` property.  This is matched against your `Content-Type` response headers, so you can limit Gzip encoding to certain response types, e.g. `text/`.
+Finally, you can control exactly which response types are compressed by setting the `compress_regex` property.  This is matched against your `Content-Type` response headers, so you can limit encoding to certain response types, e.g. `text/`.
 
 ```js
 "MyTestPool1": {
 	"script": "my_worker.js",
 	"uri_match": "^/pool1",
 	
-	"gzip_child": true,
-	"gzip_regex": "^text\\/"
+	"compress_child": true,
+	"compress_regex": "^text\\/"
 }
 ```
 
-If `gzip_regex` is omitted, it defaults to *all* content types.
+If `compress_regex` is omitted, it defaults to *all* content types.
 
-It should be noted that compressing responses in the child worker processes has trade-offs, and it is only a net performance win for payloads within a certain size range.  This is because the child / parent communication is JSON over STDIO, so the Gzip-encoded payload has to be converted to [Base64](https://en.wikipedia.org/wiki/Base64), serialized to JSON, sent over STDIO to the parent, parsed, then converted back to binary again.  So for this to be effective, your uncompressed payloads should be smaller than 1MB or so.  This also depends on CPU architecture and server hardware specs, as well as your specific application traffic and payloads.
+It should be noted that compressing responses in the child worker processes has trade-offs, and it is only a net performance win for payloads within a certain size range.  This is because the child / parent communication is JSON over STDIO, so the encoded payload has to be converted to [Base64](https://en.wikipedia.org/wiki/Base64), serialized to JSON, sent over STDIO to the parent, parsed, then converted back to binary again.  So for this to be effective, your uncompressed payloads should be smaller than 1MB or so.  This also depends on CPU architecture and server hardware specs, as well as your specific application traffic and payloads.
 
-For these reasons, child Gzip encoding is disabled by default.  It is recommended that you only enable it if you know exactly what you are doing.
+For these reasons, child encoding is disabled by default.  It is recommended that you only enable it if you know exactly what you are doing.
+
+**Note:** The legacy `gzip_child` property is still supported, and is treated as an alias to `compress_child`.
 
 ## Delegating Requests
 

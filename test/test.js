@@ -925,7 +925,9 @@ module.exports = {
 				max_requests_per_child: 0,
 				auto_maint: false,
 				maint_method: 'requests',
-				maint_requests: 10
+				maint_requests: 10,
+				compress_child: true,
+				brotli_child: true
 			};
 			
 			this.wpm.createPool( 'TestPool2', pool_config, function(err) {
@@ -971,6 +973,98 @@ module.exports = {
 							test.done();
 						} 
 					);
+				} 
+			);
+		},
+		
+		function testOnDemandPoolExternalNoCompression(test) {
+			// test no encoding in worker child
+			var self = this;
+			
+			request.get( 'http://127.0.0.1:3020/pool2?type=json',
+				{
+					headers: {
+						'Accept-Encoding': 'none'
+					}
+				},
+				function(err, resp, data, perf) {
+					test.ok( !err, "No error from PixlRequest: " + err );
+					test.ok( !!resp, "Got resp from PixlRequest" );
+					test.ok( resp.statusCode == 200, "Got 200 response: " + resp.statusCode );
+					test.ok( resp.headers['via'] == "WebServerTest 1.0", "Correct Via header: " + resp.headers['via'] );
+					test.ok( !resp.headers['content-encoding'], "Content-Encoding header is missing");
+					test.ok( !!data, "Got data in response" );
+					test.ok( !!data.length > 0, "Data has non-zero length" );
+					test.done();
+				} 
+			);
+		},
+		
+		function testOnDemandPoolExternalBrotliCompression(test) {
+			// test brotli encoding in worker child
+			var self = this;
+			
+			request.get( 'http://127.0.0.1:3020/pool2?type=json',
+				{
+					headers: {
+						'Accept-Encoding': 'br'
+					}
+				},
+				function(err, resp, data, perf) {
+					test.ok( !err, "No error from PixlRequest: " + err );
+					test.ok( !!resp, "Got resp from PixlRequest" );
+					test.ok( resp.statusCode == 200, "Got 200 response: " + resp.statusCode );
+					test.ok( resp.headers['via'] == "WebServerTest 1.0", "Correct Via header: " + resp.headers['via'] );
+					test.ok( resp.headers['content-encoding'] == "br", "Correct Content-Encoding header: " + resp.headers['content-encoding'] );
+					test.ok( !!data, "Got data in response" );
+					test.ok( !!data.length > 0, "Data has non-zero length" );
+					test.done();
+				} 
+			);
+		},
+		
+		function testOnDemandPoolExternalGzipCompression(test) {
+			// test gzip encoding in worker child
+			var self = this;
+			
+			request.get( 'http://127.0.0.1:3020/pool2?type=json',
+				{
+					headers: {
+						'Accept-Encoding': 'gzip'
+					}
+				},
+				function(err, resp, data, perf) {
+					test.ok( !err, "No error from PixlRequest: " + err );
+					test.ok( !!resp, "Got resp from PixlRequest" );
+					test.ok( resp.statusCode == 200, "Got 200 response: " + resp.statusCode );
+					test.ok( resp.headers['via'] == "WebServerTest 1.0", "Correct Via header: " + resp.headers['via'] );
+					test.ok( resp.headers['content-encoding'] == "gzip", "Correct Content-Encoding header: " + resp.headers['content-encoding'] );
+					test.ok( !!data, "Got data in response" );
+					test.ok( !!data.length > 0, "Data has non-zero length" );
+					test.done();
+				} 
+			);
+		},
+		
+		function testOnDemandPoolExternalDeflateCompression(test) {
+			// test deflate encoding in worker child
+			var self = this;
+			
+			request.get( 'http://127.0.0.1:3020/pool2?type=json',
+				{
+					headers: {
+						'Accept-Encoding': 'deflate'
+					}
+				},
+				function(err, resp, data, perf) {
+					test.ok( !err, "No error from PixlRequest: " + err );
+					test.ok( !!resp, "Got resp from PixlRequest" );
+					test.ok( resp.statusCode == 200, "Got 200 response: " + resp.statusCode );
+					test.ok( resp.headers['via'] == "WebServerTest 1.0", "Correct Via header: " + resp.headers['via'] );
+					test.ok( resp.headers['content-encoding'] == "deflate", "Correct Content-Encoding header: " + resp.headers['content-encoding'] );
+					test.ok( !!data, "Got data in response" );
+					test.ok( !!data.length > 0, "Data has non-zero length" );
+					test.done();
 				} 
 			);
 		},
