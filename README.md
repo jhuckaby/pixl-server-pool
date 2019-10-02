@@ -42,6 +42,7 @@ Worker pools can have a fixed number of workers, or grow/shrink automatically ba
 	* [Auto-Scaling](#auto-scaling)
 		+ [Child Headroom](#child-headroom)
 		+ [Max Concurrent Requests](#max-concurrent-requests)
+		+ [Request Queue](#request-queue)
 		+ [Max Requests Per Child](#max-requests-per-child)
 	* [Rolling Maintenance Sweeps](#rolling-maintenance-sweeps)
 		+ [Automatic Routine Maintenance](#automatic-routine-maintenance)
@@ -794,9 +795,21 @@ Here we're asking for 1 to 10 children, with 50% headroom.  So if 4 children are
 
 It is highly recommended that you set the `max_concurrent_requests` pool configuration property to the maximum number of simultaneous requests your application can serve, across all workers.  This value defaults to `0` which is basically unlimited.  If additional requests come in and your application is already serving `max_concurrent_requests` simultaneous requests, an [HTTP 429](#http-429-too-many-requests) response is sent.
 
-So if your workers can only serve 1 concurrent request but your `max_children` is 10, then `max_concurrent_requests` should probably be 10 as well.  However, if your workers can serve multiple concurrent requests, feel free to increase `max_concurrent_requests` beyond your max children.  Note that the pooler does not provide any sort of queuing mechanism.  All requests are delegated to workers immediately.  You can, however, queue up requests in your worker script if you want.
+So if your workers can only serve 1 concurrent request but your `max_children` is 10, then `max_concurrent_requests` should probably be 10 as well.  However, if your workers can serve multiple concurrent requests, feel free to increase `max_concurrent_requests` beyond your max children.
 
 This request limit can be somewhat governed by the [http_max_connections](https://www.npmjs.com/package/pixl-server-web#http_max_connections) setting in [pixl-server-web](https://www.npmjs.com/package/pixl-server-web), but that is talking about socket connections specifically.  A socket may be open but inactive (i.e. keep-alive), and also the pixl-server-pool module can run independently of pixl-server-web, hence the need for its own concurrent request limit.
+
+### Request Queue
+
+When a pool is servicing the maximum concurrent requests and more keep coming in, the default behavior is to send back a [HTTP 429](#http-429-too-many-requests) response.  However, if you would prefer that the extra requests be queued up, and serviced when slots become available, you can set the `max_queue_size` pool configuration property to any non-zero number:
+
+```js
+"max_queue_size": 768
+```
+
+This would allow up to 768 requests to be queued up, before it started rejecting any.  The queue system is only used if the `max_concurrent_requests` ceiling is reached, and additional pool requests are received.  Queued requests are serviced in the order in which they were received.
+
+It should be noted that the `max_queue_size` plus the `max_concurrent_requests` should never total more than the [http_max_connections](https://www.npmjs.com/package/pixl-server-web#http_max_connections) setting in [pixl-server-web](https://www.npmjs.com/package/pixl-server-web).  If the latter limit is reached, new sockets are hard-closed.  You should always leave some breathing room, for non-pool HTTP requests to be serviced, such as health checks, etc.
 
 ### Max Requests Per Child
 
@@ -1488,7 +1501,7 @@ The `HTTP 403 Forbidden` error is sent back to clients if an incoming request fa
 
 ### HTTP 429 Too Many Requests
 
-The `HTTP 429 Too Many Requests` error is sent back to clients if too many simultaneous requests are being served by your worker pool.  This limit is set via the `max_concurrent_requests` pool configuration property. 
+The `HTTP 429 Too Many Requests` error is sent back to clients if too many simultaneous requests are being served by your worker pool.  This limit is set via the `max_concurrent_requests` pool configuration property, and possibly the the `max_queue_size` property, if set.
 
 ### HTTP 500 Internal Server Error
 

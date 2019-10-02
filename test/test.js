@@ -304,6 +304,63 @@ module.exports = {
 			); // parallel
 		},
 		
+		// queue
+		function testQueue(test) {
+			// test queue mechanism when pool is at concurrent max
+			var self = this;
+			var pool = this.wpm.getPool('TestPool1');
+			
+			// hot-change config (FUTURE: Official API for this)
+			pool.config.max_queue_size = 1;
+			
+			async.parallel(
+				[
+					function(callback) {
+						request.json( 'http://127.0.0.1:3020/pool1?type=json&sleep=750', false, {},
+							function(err, resp, json, perf) {
+								test.ok( !err, "No error from PixlRequest: " + err );
+								test.ok( !!resp, "Got resp from PixlRequest" );
+								test.ok( resp.statusCode == 200, "Got 200 response: " + resp.statusCode );
+								callback();
+							}
+						); // request.json
+					},
+					function(callback) {
+						// delay this one by 250ms
+						setTimeout( function() {
+							// queue should be empty, so this one should be enqueued
+							request.json( 'http://127.0.0.1:3020/pool1?type=json&sleep=500', false, {},
+								function(err, resp, json, perf) {
+									test.ok( !err, "No error from PixlRequest: " + err );
+									test.ok( !!resp, "Got resp from PixlRequest" );
+									test.ok( resp.statusCode == 200, "Got 200 response: " + resp.statusCode );
+									callback();
+								}
+							); // request.json
+						}, 250 );
+					},
+					function(callback) {
+						// delay this one by 500ms
+						setTimeout( function() {
+							// queue should be full now, so THIS one should fail
+							request.json( 'http://127.0.0.1:3020/pool1?type=json', false, {},
+								function(err, resp, json, perf) {
+									test.ok( !!err, "Error expected from PixlRequest" );
+									test.ok( err.code == 429, "Correct HTTP error code: " + err.code );
+									test.ok( !!json.toString().match(/Also the queue is full/), "Correct error message: " + err );
+									callback();
+								}
+							); // request.json
+						}, 500 );
+					}
+				],
+				function(err) {
+					test.ok( !err, "No error from parallel functions: " + err );
+					test.done();
+				}
+			); // parallel
+		},
+		
 		// auto-scale up
 		function testAutoScaleUp(test) {
 			// test worker scaling

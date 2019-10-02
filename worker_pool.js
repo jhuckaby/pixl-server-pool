@@ -12,6 +12,7 @@ var DefaultWorkerProxy = require('./worker_proxy.js');
 module.exports = Class.create({
 	// WorkerPool represents one group of workers
 	workers: null,
+	queue: null,
 	maint_roll: null,
 	num_active_requests: 0,
 	
@@ -28,6 +29,7 @@ module.exports = Class.create({
 		max_requests_per_child: 0, // can be array
 		max_concurrent_launches: 1,
 		max_concurrent_maint: 1,
+		max_queue_size: 0,
 		child_headroom_pct: 0,
 		child_busy_factor: 1,
 		startup_timeout_sec: 0,
@@ -59,6 +61,7 @@ module.exports = Class.create({
 		this.workers = {};
 		this.maint_roll = {};
 		this.num_active_requests = 0;
+		this.queue = [];
 	},
 	
 	startup: function(callback) {
@@ -111,15 +114,29 @@ module.exports = Class.create({
 	
 	delegateRequest: function(args, callback) {
 		// delegate web request to one of our children
+		var self = this;
+		
+		// concurrency check
 		if (this.config.max_concurrent_requests && (this.num_active_requests >= this.config.max_concurrent_requests)) {
 			var msg = "Pool " + this.config.id + " is serving maximum of " + this.config.max_concurrent_requests + " concurrent requests.";
-			this.logError( 429, msg, args.request ? { ips: args.ips, uri: args.request.url, headers: args.request.headers } : null );
-			
-			return callback(
-				"429 Too Many Requests", 
-				{ 'Content-Type': "text/html" }, 
-				"429 Too Many Requests: " + msg + "\n"
-			);
+			if (this.config.max_queue_size && (this.queue.length < this.config.max_queue_size)) {
+				msg += " Enqueuing request for next available slot.";
+				this.queue.push({ args, callback });
+				this.logDebug(9, msg, { queue_size: this.queue.length });
+				return;
+			} // queue
+			else {
+				if (this.config.max_queue_size) {
+					msg += " Also the queue is full (" + this.config.max_queue_size + " requests backlogged)";
+				}
+				this.logError( 429, msg, args.request ? { ips: args.ips, uri: args.request.url, headers: args.request.headers } : null );
+				
+				return callback(
+					"429 Too Many Requests", 
+					{ 'Content-Type': "text/html" }, 
+					"429 Too Many Requests: " + msg + "\n"
+				);
+			} // no queue
 		} // HTTP 429
 		
 		// child picker: find all active workers serving the least # of concurrent requests
@@ -157,7 +174,20 @@ module.exports = Class.create({
 		this.logDebug(9, "Chose worker: " + chosen_one.pid + " for request: " + 
 			((args.cmd == 'custom') ? '(internal)' : args.request.url) );
 		
-		chosen_one.delegateRequest(args, callback);
+		chosen_one.delegateRequest(args, function(status, headers, body) {
+			callback(status, headers, body);
+			
+			// possibly dequeue a backlogged request here
+			if (self.queue.length > 0) {
+				var item = self.queue.shift();
+				
+				self.logDebug(9, "Dequeuing backlogged request: " + 
+					((item.args.cmd == 'custom') ? '(internal)' : item.args.request.url), 
+					{ queue_remain: self.queue.length });
+				
+				self.delegateRequest( item.args, item.callback );
+			}
+		});
 	},
 	
 	delegateCustom: function(user_data, callback) {
