@@ -227,9 +227,11 @@ Here is the complete list of available properties for your pool definitions:
 | `uri_match` | `''` | Optionally route all incoming web requests matching URI to worker pool (see [Delegating Requests](#delegating-requests)). |
 | `acl` | `false` | Used in conjunction with `uri_match`, optionally enable [ACL restrictions](https://npmjs.com/package/pixl-server-web#access-control-lists) for routed requests. |
 | `exec_opts` | n/a | Optionally override child spawn options such as `uid` and `gid`.  See [Child Spawn Options](#child-spawn-options). |
-| `gzip_child` | `false` | Optionally enable Gzip encoding in the worker processes.  See [Child Gzip Encoding](#child-gzip-encoding). |
-| `gzip_opts` | n/a | Optionally override the default Gzip compression settings.  See [Child Gzip Encoding](#child-gzip-encoding). |
-| `gzip_regex` | `.+` | Optionally limit which `Content-Type` values will be Gzip-encoded.  See [Child Gzip Encoding](#child-gzip-encoding). |
+| `compress_child` | `false` | Optionally enable compression in the worker processes.  See [Child Compression](#child-compression). |
+| `compress_regex` | `.+` | Optionally limit which `Content-Type` values will be encoded.  See [Child Compression](#child-compression). |
+| `gzip_opts` | n/a | Optionally override the default Gzip compression settings.  See [Child Compression](#child-compression). |
+| `brotli_child` | `false` | Optionally enable Brotli compression in worker processes.  See [Child Compression](#child-compression). |
+| `brotli_opts` | n/a | Optionally override the default Brotli compression settings.  See [Child Compression](#child-compression). |
 
 ### Child Spawn Options
 
