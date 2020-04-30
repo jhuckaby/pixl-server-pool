@@ -1,5 +1,5 @@
 // Worker Pool Proxy for pixl-server-pool
-// Copyright (c) 2017 Joseph Huckaby
+// Copyright (c) 2017 - 2020 Joseph Huckaby
 // Released under the MIT License
 
 var fs = require('fs');
@@ -9,8 +9,8 @@ var Path = require('path');
 var async = require('async');
 var Class = require("pixl-class");
 var Tools = require("pixl-tools");
-var JSONStream = require("pixl-json-stream");
 var Perf = require("pixl-perf");
+var BinaryStream = require('./stream.js');
 
 module.exports = Class.create({
 	// WorkerProxy represents one single worker process, but runs in the parent process
@@ -82,9 +82,12 @@ module.exports = Class.create({
 			return callback(err);
 		}
 		
-		// setup two-way JSON communication over stdio
-		this.stream = new JSONStream( this.child.stdout, this.child.stdin );
-		// this.stream.recordRegExp = /^\s*\{.+\}\s*$/;
+		// setup two-way msgpack communication over stdio
+		this.encodeStream = BinaryStream.createEncodeStream();
+		this.encodeStream.pipe( this.child.stdin );
+		
+		this.decodeStream = BinaryStream.createDecodeStream();
+		this.child.stdout.pipe( this.decodeStream );
 		
 		this.pid = this.child.pid;
 		this.started = false;
@@ -100,8 +103,8 @@ module.exports = Class.create({
 			}, this.config.startup_timeout_sec * 1000 );
 		}
 		
-		this.stream.on('json', function(data) {
-			// received JSON data from child
+		this.decodeStream.on('data', function(data) {
+			// received msgpack data from child
 			if (!data.cmd) {
 				self.logError('child', "Bad JSON message from child (missing cmd): " + self.pid, data);
 				return;
@@ -121,14 +124,8 @@ module.exports = Class.create({
 			else self.handleChildResponse(data);
 		} );
 		
-		this.stream.on('text', function(line) {
-			// received non-json text from child, log it or pass through if debug mode
-			if (self.pool.manager.server.debug) process.stdout.write(line);
-			else self.logError('child', "Received garbage from child: " + self.pid + ": " + line);
-		} );
-		
-		this.stream.on('error', function(err, text) {
-			// Probably a JSON parse error (child emitting garbage)
+		this.decodeStream.on('error', function(err, text) {
+			// Probably a msgpack decode error (child emitting garbage)
 			self.logError('child', "Child stream error: " + self.pid + ": " + err);
 		} );
 		
@@ -136,7 +133,7 @@ module.exports = Class.create({
 		this.child.stderr.setEncoding('utf8');
 		this.child.stderr.on('data', function(data) {
 			if (self.pool.manager.server.debug) process.stderr.write(''+data);
-			else self.logError('child', "Received error from child: " + self.pid + ": " + data);
+			else self.logError('child', "STDERR: " + self.pid + ": " + data);
 		});
 		
 		this.child.on('error', function (err) {
@@ -200,7 +197,7 @@ module.exports = Class.create({
 		} ); // on exit
 		
 		// send initial config to child
-		this.stream.write({
+		this.encodeStream.write({
 			cmd: 'startup', 
 			config: this.config,
 			server: {
@@ -218,7 +215,6 @@ module.exports = Class.create({
 		var data = {
 			cmd: args.cmd || 'request',
 			id: this.pool.manager.getUniqueID('r'),
-			// id: Tools.generateUniqueID(64, this.config.id),
 			params: args.params
 		};
 		
@@ -250,10 +246,9 @@ module.exports = Class.create({
 				}
 			}
 			
-			// args.params.raw may be Buffer, need to encode it
+			// args.params.raw may be Buffer (msgpack will encode it)
 			if (data.params.raw) {
-				data.params.raw = data.params.raw.toString('base64');
-				data.type = 'base64';
+				data.type = 'buffer';
 			}
 		} // web request
 		
@@ -273,7 +268,7 @@ module.exports = Class.create({
 		if (args.perf) args.perf.begin('worker');
 		
 		// send request to child
-		this.stream.write( data );
+		this.encodeStream.write( data );
 	},
 	
 	delegateCustom: function(user_data, callback) {
@@ -305,8 +300,8 @@ module.exports = Class.create({
 	
 	sendMessage: function(user_data) {
 		// send custom user message to child
-		if (this.stream) {
-			this.stream.write({
+		if (this.encodeStream) {
+			this.encodeStream.write({
 				cmd: 'message',
 				data: user_data || false
 			});
@@ -395,12 +390,12 @@ module.exports = Class.create({
 		var body = data.body;
 		
 		switch (data.type) {
-			case 'base64':
-				body = Buffer.from(body, 'base64');
-			break;
-			
 			case 'file':
 				return this.sendFileResponse(data, req);
+			break;
+			
+			case 'buffer':
+				// body should be a buffer
 			break;
 			
 			case 'stream':
@@ -493,7 +488,7 @@ module.exports = Class.create({
 		this.logDebug(4, "Worker " + this.pid + " entering maintenance mode");
 		this.logDebug(6, "Sending 'maint' command to process: " + this.pid);
 		
-		this.stream.write({ cmd: 'maint', data: data || true });
+		this.encodeStream.write({ cmd: 'maint', data: data || true });
 		this.changeState('maint');
 		
 		// make sure maint doesn't take too long
@@ -511,16 +506,16 @@ module.exports = Class.create({
 		// shut down child
 		var self = this;
 		
-		if (this.stream) {
+		if (this.encodeStream) {
 			this.logDebug(4, "Worker " + this.pid + " shutting down (" + this.num_requests_served + " requests served)");
 			this.logDebug(6, "Sending 'shutdown' command to process: " + this.pid);
 			
-			this.stream.write({ cmd: 'shutdown' });
+			this.encodeStream.write({ cmd: 'shutdown' });
 			this.shut = true;
 			this.changeState('shutdown');
 			
 			// we're done writing to the child -- don't hold open its stdin
-			this.child.stdin.end();
+			this.encodeStream.end();
 			
 			// start timer to make sure child exits
 			this.kill_timer = setTimeout( function() {

@@ -330,10 +330,6 @@ Finally, you can control exactly which response types are compressed by setting 
 
 If `compress_regex` is omitted, it defaults to *all* content types.
 
-It should be noted that compressing responses in the child worker processes has trade-offs, and it is only a net performance win for payloads within a certain size range.  This is because the child / parent communication is JSON over STDIO, so the encoded payload has to be converted to [Base64](https://en.wikipedia.org/wiki/Base64), serialized to JSON, sent over STDIO to the parent, parsed, then converted back to binary again.  So for this to be effective, your uncompressed payloads should be smaller than 1MB or so.  This also depends on CPU architecture and server hardware specs, as well as your specific application traffic and payloads.
-
-For these reasons, child encoding is disabled by default.  It is recommended that you only enable it if you know exactly what you are doing.
-
 **Note:** The legacy `gzip_child` property is still supported, and is treated as an alias to `compress_child`.
 
 ## Delegating Requests
@@ -553,7 +549,7 @@ The `args` object should still provide everything you need to serve the request,
 | `args.cookies` | The parsed cookie as key/value pairs (see [args.cookies](https://npmjs.com/package/pixl-server-web#argscookies)). |
 | `args.files` | All uploaded files (see [args.files](https://www.npmjs.com/package/pixl-server-web#argsfiles)). |
 | `args.perf` | A [pixl-perf](https://www.npmjs.com/package/pixl-perf) object you can use for tracking app performance (see [Performance Tracking](#performance-tracking)). |
-| `args.response.type` | Specifies the response type, e.g. `string`, `base64`, `json` (see below). |
+| `args.response.type` | Specifies the response type, e.g. `string`, `buffer`, `json` (see below). |
 | `args.response.status` | The HTTP response code, e.g. `200 OK`, `404 Not Found`. |
 | `args.response.headers` | The response headers (key/value pairs, mixed case). |
 | `args.response.body` | The response body (String, Buffer, etc.).  See below. |
@@ -582,7 +578,7 @@ callback();
 
 #### Binary Responses
 
-To send a binary response from your worker, you can use a [Buffer](https://nodejs.org/api/buffer.html) object.  However, depending on the size of the data, you may want to consider using a file instead (see [File Responses](#file-responses) below).  The reason is, your Buffer must be converted to [Base64](https://en.wikipedia.org/wiki/Base64) so it can be routed through JSON back to the parent process, where it is unpacked again.  For larger blobs, a file may be faster.
+To send a binary response from your worker, you can use a [Buffer](https://nodejs.org/api/buffer.html) object.  However, depending on the size of the data, you may want to consider using a file instead (see [File Responses](#file-responses) below).  The reason is memory, as the buffer has to momentarily exist in both the child and the parent.  For larger blobs, a file may be faster.
 
 To send a Buffer, fire the callback with the standard 3 arguments from [pixl-server-web](https://npmjs.com/package/pixl-server-web#custom-uri-handlers) URI handlers, but pass the Buffer as the body (3rd argument).  Example:
 

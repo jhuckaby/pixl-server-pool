@@ -1,16 +1,12 @@
 // Worker Child Process Handler for pixl-server-pool
 // Spawned via worker_proxy.js, runs in separate process
-// Copyright (c) 2017 Joseph Huckaby
+// Copyright (c) 2017 - 2020 Joseph Huckaby
 // Released under the MIT License
 
 var Path = require('path');
 var zlib = require('zlib');
-var JSONStream = require("pixl-json-stream");
-var Perf = require("pixl-perf");
-
-// setup stdin / stdout streams 
-process.stdin.setEncoding('utf8');
-process.stdout.setEncoding('utf8');
+var Perf = require('pixl-perf');
+var BinaryStream = require('./stream.js');
 
 // catch SIGINT and ignore (parent handles these)
 process.on('SIGINT', function() {});
@@ -28,8 +24,14 @@ var worker = {
 		// startup child process
 		var self = this;
 		
-		this.stream = new JSONStream( process.stdin, process.stdout );
-		this.stream.on('json', this.receiveCommand.bind(this));
+		// setup two-way msgpack communication over stdio
+		this.encodeStream = BinaryStream.createEncodeStream();
+		this.encodeStream.pipe( process.stdout );
+		
+		this.decodeStream = BinaryStream.createDecodeStream();
+		process.stdin.pipe( this.decodeStream );
+		
+		this.decodeStream.on('data', this.receiveCommand.bind(this));
 		
 		process.on('SIGTERM', function() {
 			// caught SIGTERM, which means the parent crashed
@@ -147,11 +149,6 @@ var worker = {
 		req.perf = new Perf();
 		req.perf.begin();
 		
-		// decode base64 raw post buffer if present
-		if ((req.type == 'base64') && req.params.raw) {
-			req.params.raw = Buffer.from(req.params.raw, 'base64');
-		}
-		
 		// prepare response, which child can modify
 		var res = {
 			id: req.id,
@@ -235,9 +232,8 @@ var worker = {
 				
 				// set res type and massage body if needed
 				if (res.body && (res.body instanceof Buffer)) {
-					// base64 encode buffers
-					res.type = 'base64';
-					res.body = res.body.toString('base64');
+					// buffers survive msgpack
+					res.type = 'buffer';
 				}
 				else if (res.body && (typeof(res.body) == 'object')) {
 					res.type = 'string';
@@ -306,9 +302,9 @@ var worker = {
 						};
 					}
 					else {
-						// no error, wrap in base64 for JSON
-						res.type = 'base64';
-						res.body = data.toString('base64');
+						// no error, send as buffer (msgpack)
+						res.type = 'buffer';
+						res.body = data;
 					}
 					
 					finishResponse();
@@ -366,7 +362,7 @@ var worker = {
 		// send command back to parent
 		if (!data) data = {};
 		data.cmd = cmd;
-		this.stream.write(data);
+		this.encodeStream.write(data);
 	},
 	
 	sendMessage: function(data) {
@@ -405,6 +401,9 @@ var worker = {
 		}
 		this.request_shutdown = false;
 		
+		// close encode stream
+		this.encodeStream.end();
+		
 		// allow user code to run its own async shutdown routine
 		if (this.user_obj.shutdown) {
 			this.user_obj.shutdown( function() {
@@ -427,5 +426,8 @@ var worker = {
 		// Note: not calling process.exit here, because uncatch does it for us
 	}
 };
+
+// redirect console._stdout, as it will interfere with msgpack
+console._stdout = console._stderr;
 
 worker.run();

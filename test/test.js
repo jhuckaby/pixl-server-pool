@@ -1,5 +1,5 @@
 // Unit tests for pixl-server-pool
-// Copyright (c) 2017 Joseph Huckaby
+// Copyright (c) 2017 - 2020 Joseph Huckaby
 // Released under the MIT License
 
 var os = require('os');
@@ -31,7 +31,7 @@ var server = new PixlServer({
 	config: {
 		"log_dir": __dirname,
 		"log_filename": "test.log",
-		"debug_level": 9,
+		"debug_level": 10,
 		"debug": 1,
 		"echo": 0,
 		

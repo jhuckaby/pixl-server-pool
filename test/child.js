@@ -50,7 +50,7 @@ module.exports = {
 			
 			case 'buffer':
 				// send back binary buffer
-				res.type = 'base64';
+				res.type = 'buffer';
 				res.headers['Content-Type'] = "image/gif";
 				res.body = fs.readFileSync('spacer.gif');
 			break;
