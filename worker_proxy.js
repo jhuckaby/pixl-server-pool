@@ -129,6 +129,11 @@ module.exports = Class.create({
 			self.logError('child', "Child stream error: " + self.pid + ": " + err);
 		} );
 		
+		this.encodeStream.on('error', function(err, text) {
+			// Probably a dead child that didn't register as dead yet
+			self.logError('child', "Child stream error: " + self.pid + ": " + err);
+		} );
+		
 		// listen on stderr as well (stack trace, etc.)
 		this.child.stderr.setEncoding('utf8');
 		this.child.stderr.on('data', function(data) {
