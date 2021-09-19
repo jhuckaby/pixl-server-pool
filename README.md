@@ -727,6 +727,37 @@ The idea here is that the [Worker.addURIHandler()](#workeraddurihandler) method 
 
 Please note that if you require [ACL restrictions](https://npmjs.com/package/pixl-server-web#access-control-lists) you need to apply them in the parent (web server) process, and not in the child worker.
 
+### Worker Logging
+
+You can use any logging system in your worker code that you wish.  However, if you happen to use [pixl-logger])(https://github.com/jhuckaby/pixl-logger), you can attach this to the pool worker singleton, to augment your logs with pool-related debug events.  To set this up, call `attachLogAgent()` on the `worker` object in your `startup()` function like this:
+
+```js
+// in my_worker.js
+const Logger = require('pixl-logger');
+
+exports.startup = function(worker, callback) {
+	// child is starting up, save reference to worker
+	this.worker = worker;
+	
+	// setup our own logger
+	var columns = ['hires_epoch', 'date', 'hostname', 'pid', 'component', 'category', 'code', 'msg', 'data'];
+	this.logger = new Logger( 'logs/worker.log', columns );
+	
+	// attach logger to worker
+	this.worker.attachLogAgent( this.logger );
+	
+	callback();
+};
+```
+
+The log entries will include things such as:
+
+- Worker startup
+- Worker maintenance
+- Worker shutdown
+- Sending commands to the parent process (logged at level 9)
+- Worker debugger events (see [pixl-server-debug](https://github.com/jhuckaby/pixl-server-debug))
+
 ## Auto-Scaling
 
 Auto-scaling is an optional feature that will actively monitor your child workers, and spawn new ones and/or kill off idle ones as needed, based on how busy they are.  This behavior is activated by setting the `min_children` and `max_children` pool configuration properties to different values.  Example:

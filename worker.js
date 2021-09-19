@@ -1,11 +1,12 @@
 // Worker Child Process Handler for pixl-server-pool
 // Spawned via worker_proxy.js, runs in separate process
-// Copyright (c) 2017 - 2020 Joseph Huckaby
+// Copyright (c) 2017 - 2021 Joseph Huckaby
 // Released under the MIT License
 
 var Path = require('path');
 var zlib = require('zlib');
 var Perf = require('pixl-perf');
+var Tools = require("pixl-tools");
 var BinaryStream = require('./stream.js');
 
 // catch SIGINT and ignore (parent handles these)
@@ -13,6 +14,7 @@ process.on('SIGINT', function() {});
 
 var worker = {
 	
+	__name: 'PoolWorker',
 	config: null,
 	user_obj: null,
 	num_active_requests: 0,
@@ -40,6 +42,21 @@ var worker = {
 			self.emergencyShutdown( err );
 			process.exit(1);
 		});
+		
+		// copy refs to global on inspector start
+		this.globals = {
+			worker: this
+		};
+	},
+	
+	attachLogAgent: function(logger) {
+		// attach pixl-logger compatible log agent
+		this.logger = logger;
+	},
+	
+	addDebugGlobals: function(obj) {
+		// add custom globals when debugger starts
+		Tools.mergeHashInto( this.globals, obj );
 	},
 	
 	receiveCommand: function(req) {
@@ -63,6 +80,10 @@ var worker = {
 			
 			case 'message':
 				this.handleMessage(req);
+			break;
+			
+			case 'internal':
+				this.handleInternal(req);
 			break;
 			
 			case 'shutdown':
@@ -127,14 +148,23 @@ var worker = {
 			this.config.script.match(/^\//) ? this.config.script : Path.join(process.cwd(), this.config.script) 
 		);
 		
+		// expose user app in globals for debugger
+		this.addDebugGlobals({ app: this.user_obj });
+		
 		// call user startup
 		if (this.user_obj.startup) {
 			this.user_obj.startup( this, function(err) {
 				if (err) throw err;
-				else self.sendCommand('startup_complete');
+				else {
+					self.logDebug(3, "Worker starting up");
+					self.sendCommand('startup_complete');
+				}
 			} );
 		}
-		else this.sendCommand('startup_complete');
+		else {
+			this.logDebug(3, "Worker starting up");
+			this.sendCommand('startup_complete');
+		}
 	},
 	
 	handleRequest: function(req) {
@@ -188,7 +218,8 @@ var worker = {
 			if (!res.perf) res.perf = req.perf.metrics();
 			
 			// send response to parent
-			self.sendCommand('response', res);
+			res.cmd = 'response';
+			self.encodeStream.write(res);
 			
 			// done with this request
 			self.num_active_requests--;
@@ -329,9 +360,120 @@ var worker = {
 		}
 	},
 	
+	handleInternal: function(req) {
+		// received internal command from server
+		var data = req.data || {};
+		switch (data.action) {
+			case 'start_debug': this.startDebug(data); break;
+			case 'stop_debug': this.stopDebug(data); break;
+			case 'update_debug': this.updateDebug(data); break;
+		}
+	},
+	
+	startDebug: function(data) {
+		// start debugger
+		this.origDebugLevel = this.logger ? this.logger.get('debugLevel') : 0;
+		
+		if (!this.inspector) {
+			this.inspector = require('inspector');
+		}
+		
+		if (!this.inspector.url()) {
+			var host = data.host || '0.0.0.0';
+			var port = data.port || 9229;
+			this.logDebug(2, "Opening debug inspector port " + port);
+			this.inspector.open( port, host );
+		}
+		
+		var url = this.inspector.url();
+		this.logDebug(5, "Inspector URL: " + url);
+		
+		url = url.replace(/^(\w+\:\/\/)([\w\-\.]+)(.+)$/, '$1' + this.server.ip + '$3');
+		this.logDebug(5, "Swapping in LAN IP: " + url);
+		
+		url = url.replace(/^\w+\:\/\//, 'devtools://devtools/bundled/js_app.html?experiments=true&v8only=true&ws=');
+		this.logDebug(5, "Wrapping in devtools proto: " + url);
+		
+		// inform parent debugger has started
+		this.sendCommand( 'internal', { 
+			action: 'debug_started', 
+			url: url,
+			pid: process.pid,
+			echo: this.logger ? this.logger.get('echo') : false,
+			debugLevel: this.origDebugLevel
+		});
+		
+		// infuse globals for easy access from inspector
+		Tools.mergeHashInto( global, this.globals );
+		
+		this.inspector.console.log("%cNode.js Remote Debugger has started.", "color:green; font-family:sans-serif; font-size:20px");
+		this.inspector.console.log("%c" + this.config.id + " Pool Worker (PID " + process.pid + ")", "color:green; font-family:sans-serif;");
+		this.inspector.console.log("%cCustom globals available: " + Object.keys(this.globals).sort().join(', '), "color:green; font-family:sans-serif;");
+	},
+	
+	stopInspector: function() {
+		// shut down inspector listener
+		if (this.inspector) {
+			this.logDebug(2, "Shutting down debug inspector");
+			if (this.logger) {
+				this.logger.set('echo', false);
+				this.logger.echoer = null;
+				this.logger.set('debugLevel', this.origDebugLevel);
+				delete this.origDebugLevel;
+			}
+			this.inspector.close();
+			delete this.inspector;
+			
+			// remove globals we added
+			for (var key in this.globals) {
+				delete global[key];
+			}
+		}
+	},
+	
+	stopDebug: function(data) {
+		// stop debugger
+		this.stopInspector();
+	},
+	
+	updateDebug: function(data) {
+		// enable/disable log mirror, change log level
+		// data: { echo, level, match }
+		var self = this;
+		if (!this.logger) return; // sanity
+		this.logDebug(5, "Changing debug log settings", data);
+		
+		try {
+			this.logger._echoMatch = new RegExp( data.match || '.+' );
+		}
+		catch (err) {
+			this.logError('regexp', "Invalid regular expression for log match: " + data.match + ": " + err);
+			this.logger._echoMatch = /.+/;
+		}
+		
+		if (data.echo && (parseInt(data.echo) != 0)) {
+			this.logDebug(5, "Activating log inspector echo mirror");
+			this.logger.echoer = function(line, cols, args) {
+				if (self.inspector && self.inspector.console && line.match(self.logger._echoMatch)) {
+					self.inspector.console.log( line );
+				}
+			};
+			this.logger.set('echo', true);
+		}
+		else {
+			this.logger.set('echo', false);
+			this.logger.echoer = null;
+		}
+		
+		if (data.level) {
+			this.logger.set('debugLevel', parseInt(data.level));
+		}
+	},
+	
 	maint: function(user_data) {
 		// perform routine maintenance
 		var self = this;
+		this.logDebug(5, "Performing worker maintenance");
 		
 		// make sure no requests are active
 		if (this.num_active_requests) {
@@ -360,15 +502,17 @@ var worker = {
 	
 	sendCommand: function(cmd, data) {
 		// send command back to parent
+		// merge cmd in with data (clobbers!)
 		if (!data) data = {};
 		data.cmd = cmd;
+		this.logDebug(9, "Sending command to parent: " + cmd, data);
 		this.encodeStream.write(data);
 	},
 	
 	sendMessage: function(data) {
 		// send custom user message
 		// separate out user data to avoid any chance of namespace collision
-		this.sendCommand('message', { data: data });
+		this.encodeStream.write({ cmd: 'message', data: data });
 	},
 	
 	addURIHandler: function(uri, name, callback) {
@@ -393,8 +537,40 @@ var worker = {
 		} );
 	},
 	
+	logDebug: function(level, msg, data) {
+		// proxy request to system logger with correct component
+		if (!this.logger) return;
+		
+		if (level <= this.logger.get('debugLevel')) {
+			this.logger.set( 'component', this.__name );
+			this.logger.print({ 
+				category: 'debug', 
+				code: level, 
+				msg: msg, 
+				data: data 
+			});
+		}
+	},
+	
+	logError: function(code, msg, data) {
+		// proxy request to system logger with correct component
+		if (!this.logger) return;
+		this.logger.set( 'component', this.__name );
+		this.logger.error( code, msg, data );
+	},
+	
+	logTransaction: function(code, msg, data) {
+		// proxy request to system logger with correct component
+		if (!this.logger) return;
+		this.logger.set( 'component', this.__name );
+		this.logger.transaction( code, msg, data );
+	},
+	
 	shutdown: function() {
 		// exit child process when we're idle
+		this.logDebug(2, "Shutting down worker");
+		this.stopInspector();
+		
 		if (this.num_active_requests) {
 			this.request_shutdown = true;
 			return;
@@ -417,6 +593,9 @@ var worker = {
 	
 	emergencyShutdown: function(err) {
 		// emergency shutdown, due to crash
+		this.logDebug(1, "Emergency Worker Shutdown: " + err);
+		this.stopInspector();
+		
 		if (this.user_obj && this.user_obj.emergencyShutdown) {
 			this.user_obj.emergencyShutdown(err);
 		}

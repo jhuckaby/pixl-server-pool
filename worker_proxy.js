@@ -313,6 +313,16 @@ module.exports = Class.create({
 		}
 	},
 	
+	sendInternal: function(data) {
+		// send internal command to child
+		if (this.encodeStream) {
+			this.encodeStream.write({
+				cmd: 'internal',
+				data: data || false
+			});
+		}
+	},
+	
 	abortAllRequests: function(msg) {
 		// abort all active requests (child died)
 		if (!msg) msg = "Unknown Reason";
@@ -375,7 +385,16 @@ module.exports = Class.create({
 				this.pool.emit('message', data);
 				return;
 			break;
-		}
+			
+			case 'internal':
+				// internal command from child, emit as event
+				this.logDebug(10, "Received internal response from child: " + this.pid, data.data);
+				data.pid = this.pid;
+				this.emit('internal', data);
+				this.pool.emit('internal', data);
+				return;
+			break;
+		} // switch cmd
 		
 		// locate request so we can send response
 		var req = this.requests[ data.id ];
