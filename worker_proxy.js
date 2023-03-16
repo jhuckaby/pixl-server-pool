@@ -219,7 +219,7 @@ module.exports = Class.create({
 		// create new serializable request object
 		var data = {
 			cmd: args.cmd || 'request',
-			id: this.pool.manager.getUniqueID('r'),
+			id: args.id || this.pool.manager.getUniqueID('r'),
 			params: args.params
 		};
 		
