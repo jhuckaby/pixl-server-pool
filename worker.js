@@ -212,6 +212,31 @@ var worker = {
 			}
 		} // request cmd
 		
+		// handle request timeout in worker as well
+		var timed_out = false;
+		var timer = ((req.cmd == 'request') && this.config.request_timeout_sec) ? setTimeout( function() {
+			timed_out = true;
+			timer = null;
+			
+			self.logError('timeout', "Request timed out: " + req.uri + " (" + self.config.request_timeout_sec + " sec)", {
+				id: req.id,
+				method: req.method,
+				url: req.uri,
+				ips: req.ips,
+				headers: req.headers,
+				perf: req.perf.metrics()
+			} );
+			
+			// done with this request
+			self.num_active_requests--;
+			
+			// if we're idle now, check for pending maint / shutdown requests
+			if (!self.num_active_requests) {
+				if (self.request_shutdown) self.shutdown();
+				else if (self.request_maint) self.maint(self.request_maint);
+			}
+		}, this.config.request_timeout_sec * 1000 ) : null;
+		
 		// finish response and send to stdio pipe
 		var finishResponse = function() {
 			// copy perf metrics over to res
@@ -233,6 +258,10 @@ var worker = {
 		
 		// handle response back from user obj
 		var handleResponse = function() {
+			// check for timeout first
+			if (timed_out) return;
+			if (timer) { clearTimeout(timer); timer = null; }
+			
 			// check for error as solo arg
 			if ((arguments.length == 1) && (arguments[0] instanceof Error)) {
 				res.status = "500 Internal Server Error";
@@ -572,6 +601,7 @@ var worker = {
 		this.stopInspector();
 		
 		if (this.num_active_requests) {
+			this.logDebug(2, commify(this.num_active_requests) + " requests still active, shutdown will be delayed.");
 			this.request_shutdown = true;
 			return;
 		}
