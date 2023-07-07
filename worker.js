@@ -601,7 +601,7 @@ var worker = {
 		this.stopInspector();
 		
 		if (this.num_active_requests) {
-			this.logDebug(2, commify(this.num_active_requests) + " requests still active, shutdown will be delayed.");
+			this.logDebug(2, this.num_active_requests + " requests still active, shutdown will be delayed.");
 			this.request_shutdown = true;
 			return;
 		}
