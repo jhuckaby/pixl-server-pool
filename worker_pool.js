@@ -32,6 +32,7 @@ module.exports = Class.create({
 		max_queue_size: 0,
 		child_headroom_pct: 0,
 		child_busy_factor: 1,
+		child_cooldown_sec: 0,
 		startup_timeout_sec: 0,
 		shutdown_timeout_sec: 10,
 		request_timeout_sec: 0,
@@ -360,7 +361,7 @@ module.exports = Class.create({
 			var worker = this.workers[pid];
 			if (worker.state == 'active') {
 				if (worker.num_active_requests >= this.config.child_busy_factor) num_busy++;
-				else if (!worker.num_active_requests) idle_kids[pid] = 1;
+				else if (!worker.num_active_requests && ((now - worker.started) >= this.config.child_cooldown_sec)) idle_kids[pid] = 1;
 			}
 			total_children++;
 		}

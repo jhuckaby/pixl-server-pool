@@ -117,7 +117,7 @@ module.exports = Class.create({
 					delete self.startup_timer;
 				}
 				self.logDebug(5, "Worker " + self.pid + " startup complete, ready to serve");
-				self.started = true;
+				self.started = Tools.timeNow();
 				self.changeState('active');
 				callback();
 			}

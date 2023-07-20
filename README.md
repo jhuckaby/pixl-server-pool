@@ -216,6 +216,7 @@ Here is the complete list of available properties for your pool definitions:
 | `max_concurrent_maint` | `1` | Maximum number of concurrent children to allow in a maintenance state (see [Rolling Maintenance Sweeps](#rolling-maintenance-sweeps)). |
 | `child_headroom_pct` | `0` | Percentage of workers to over-allocate, for scaling purposes (see [Child Headroom](#child-headroom). |
 | `child_busy_factor` | `1` | Number of concurrent requests served by one child to consider it to be "busy" (see [Auto-Scaling](#auto-scaling)). |
+| `child_cooldown_sec` | `0` | Minimum number of child active lifetime seconds before it can be considered for idle shutdown (see [Auto-Scaling](#auto-scaling)). |
 | `startup_timeout_sec` | `0` | Maximum time allowed for workers to start up.  If exceeded the process is killed and an error logged. |
 | `shutdown_timeout_sec` | `10` | Maximum time allowed for workers to shut down.  If exceeded a SIGKILL is sent and an error logged. |
 | `request_timeout_sec` | `0` | Maximum execution time allowed per worker request.  If exceeded a [HTTP 504](#http-504-gateway-timeout) is sent. |
@@ -851,6 +852,14 @@ This property can be a single number, or a range of numbers.  The latter will pi
 ```
 
 This would kill off children between 1000 to 2000 requests, randomly picked once per child.  The idea here is that you may not want all your children to cycle out at the same time, and would rather stagger them over a wider period.  This is especially important for production scale apps with heavy memory leaks, requiring a short worker lifespan.
+
+### Child Cooldown
+
+The `child_cooldown_sec` pool configuration property sets a minimum amount of time (in seconds) that new children must be active until they can be considered for idle shutdown.  Setting this to a non-zero value, such as `60` seconds, reduces child thrashing during periods of choppy traffic.  Example:
+
+```js
+"child_cooldown_sec": 60
+```
 
 ## Rolling Maintenance Sweeps
 
