@@ -217,6 +217,7 @@ var worker = {
 		var timer = ((req.cmd == 'request') && this.config.request_timeout_sec) ? setTimeout( function() {
 			timed_out = true;
 			timer = null;
+			req.aborted = true;
 			
 			self.logError('timeout', "Request timed out: " + req.uri + " (" + self.config.request_timeout_sec + " sec)", {
 				id: req.id,

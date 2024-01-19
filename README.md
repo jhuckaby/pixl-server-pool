@@ -554,6 +554,7 @@ The `args` object should still provide everything you need to serve the request,
 | `args.response.status` | The HTTP response code, e.g. `200 OK`, `404 Not Found`. |
 | `args.response.headers` | The response headers (key/value pairs, mixed case). |
 | `args.response.body` | The response body (String, Buffer, etc.).  See below. |
+| `args.aborted` | Will be set to `true` if the request was aborted, e.g. from a timeout. |
 
 #### Text Responses
 
