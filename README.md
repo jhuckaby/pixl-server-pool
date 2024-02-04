@@ -1,6 +1,6 @@
 # Overview
 
-This module is a component for use in [pixl-server](https://www.npmjs.com/package/pixl-server).  It manages pools of child worker processes, and is designed to integrate with the [pixl-server-web](https://www.npmjs.com/package/pixl-server-web) component (but can also run independently).  Using this you can delegate requests to pools of children, instead of processing everything in the parent process.  This can be very useful for CPU-hard operations such as image transformations.
+This module is a component for use in [pixl-server](https://www.github.com/jhuckaby/pixl-server).  It manages pools of child worker processes, and is designed to integrate with the [pixl-server-web](https://www.github.com/jhuckaby/pixl-server-web) component (but can also run independently).  Using this you can delegate requests to pools of children, instead of processing everything in the parent process.  This can be very useful for CPU-hard operations such as image transformations.
 
 Worker pools can have a fixed number of workers, or grow/shrink automatically based on usage and adjustable headroom.  Your worker code can listen for all child life cycle events, including startup, new request (obviously), custom message, maintenance, and shutdown.  You choose which requests are delegated to worker pools, either by URI pattern (routing), or by custom API calls from your code.
 
@@ -95,59 +95,59 @@ Worker pools can have a fixed number of workers, or grow/shrink automatically ba
 
 Use [npm](https://www.npmjs.com/) to install the module:
 
-```
+```sh
 npm install pixl-server pixl-server-web pixl-server-pool
 ```
 
 Here is a simple usage example.  Note that the component's official name is `PoolManager`, so that is what you should use for the configuration key, and for gaining access to the component via your server object.
 
-```javascript
-	var PixlServer = require('pixl-server');
-	var server = new PixlServer({
+```js
+const PixlServer = require('pixl-server');
+let server = new PixlServer({
+	
+	__name: 'MyServer',
+	__version: "1.0",
+	
+	config: {
+		"log_dir": "/let/log",
+		"debug_level": 9,
 		
-		__name: 'MyServer',
-		__version: "1.0",
-		
-		config: {
-			"log_dir": "/var/log",
-			"debug_level": 9,
-			
-			"WebServer": {
-				"http_port": 80,
-				"http_htdocs_dir": "/var/www/html"
-			},
-			
-			"PoolManager": {
-				"pools": {
-					"MyTestPool": {
-						"script": "my_worker.js",
-						"uri_match": "^/pool",
-						"min_children": 1,
-						"max_children": 10
-					}
-				}
-			}
+		"WebServer": {
+			"http_port": 80,
+			"http_htdocs_dir": "/let/www/html"
 		},
 		
-		components: [
-			require('pixl-server-web'),
-			require('pixl-server-pool')
-		]
-		
-	});
+		"PoolManager": {
+			"pools": {
+				"MyTestPool": {
+					"script": "my_worker.js",
+					"uri_match": "^/pool",
+					"min_children": 1,
+					"max_children": 10
+				}
+			}
+		}
+	},
 	
-	server.startup( function() {
-		// server startup complete
-	} );
-```
-
-Notice how we are loading the [pixl-server](https://www.npmjs.com/package/pixl-server) parent module, and then specifying [pixl-server-web](https://www.npmjs.com/package/pixl-server-web) and [pixl-server-pool](https://www.npmjs.com/package/pixl-server-pool) as components:
-
-```javascript
 	components: [
 		require('pixl-server-web'),
 		require('pixl-server-pool')
 	]
+	
+});
+
+server.startup( function() {
+	// server startup complete
+} );
+```
+
+Notice how we are loading the [pixl-server](https://www.github.com/jhuckaby/pixl-server) parent module, and then specifying [pixl-server-web](https://www.github.com/jhuckaby/pixl-server-web) and [pixl-server-pool](https://www.github.com/jhuckaby/pixl-server-pool) as components:
+
+```js
+components: [
+	require('pixl-server-web'),
+	require('pixl-server-pool')
+]
 ```
 
 This example demonstrates a very simple pool setup, which will automatically route incoming URIs starting with `/pool`, delegating those requests to worker children (up to 10 of them), and proxying their responses back to the client.  The workers themselves are spawned as child processes, where your script (specified by the `script` property) is pre-loaded to handle requests.  Example worker script:
@@ -178,7 +178,7 @@ The configuration for this component is specified by passing in a `PoolManager` 
 |---------------|---------------|-------------|
 | `pools` | `{}` | Define worker pools to launch on startup (see below). |
 | `startup_threads` | `1` | How many concurrent threads to use when launching multiple startup pools. |
-| `uncatch` | `false` | Set to `true` to use [uncatch](https://www.npmjs.com/package/uncatch) for handling uncaught exceptions (see [Uncaught Exceptions](#uncaught-exceptions) below). |
+| `uncatch` | `false` | Set to `true` to use [uncatch](https://www.github.com/jhuckaby/uncatch) for handling uncaught exceptions (see [Uncaught Exceptions](#uncaught-exceptions) below). |
 
 Inside the `pools` object you can define one or more worker pools, which will all be launched on startup.  Each pool should be assigned a unique ID (property name, used for logging), and the value should be a sub-object with configuration parameters for the pool.  Example:
 
@@ -226,7 +226,7 @@ Here is the complete list of available properties for your pool definitions:
 | `maint_requests` | `1000` | When `maint_method` is set to `requests` this specifies the number of worker requests to count between maintenance sweeps. |
 | `maint_time_sec` | `0` | When `maint_method` is set to `time` this specifies the number of seconds between maintenance sweeps (tracked per worker). |
 | `uri_match` | `''` | Optionally route all incoming web requests matching URI to worker pool (see [Delegating Requests](#delegating-requests)). |
-| `acl` | `false` | Used in conjunction with `uri_match`, optionally enable [ACL restrictions](https://npmjs.com/package/pixl-server-web#access-control-lists) for routed requests. |
+| `acl` | `false` | Used in conjunction with `uri_match`, optionally enable [ACL restrictions](https://github.com/jhuckaby/pixl-server-web#access-control-lists) for routed requests. |
 | `exec_opts` | n/a | Optionally override child spawn options such as `uid` and `gid`.  See [Child Spawn Options](#child-spawn-options). |
 | `compress_child` | `false` | Optionally enable compression in the worker processes.  See [Child Compression](#child-compression). |
 | `compress_regex` | `.+` | Optionally limit which `Content-Type` values will be encoded.  See [Child Compression](#child-compression). |
@@ -354,7 +354,7 @@ For automatic routing based on the URI, all you need to do is specify a `uri_mat
 
 This would route all requests with URIs that start with `/pool1` to the worker pool.  If you want to route *all* requests, just set the `uri_match` property to `".+"` (match anything).
 
-If you need to apply [ACL restrictions](https://npmjs.com/package/pixl-server-web#access-control-lists) to your worker requests, set the `acl` property to `true` (or an array of [CIDR blocks](https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing)).  Example:
+If you need to apply [ACL restrictions](https://github.com/jhuckaby/pixl-server-web#access-control-lists) to your worker requests, set the `acl` property to `true` (or an array of [CIDR blocks](https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing)).  Example:
 
 ```js
 "PoolManager": {
@@ -370,14 +370,14 @@ If you need to apply [ACL restrictions](https://npmjs.com/package/pixl-server-we
 
 ### Manual Request Routing
 
-For more control over your request workflow, you can choose exactly how and when to delegate requests to worker pools.  To do this, add a standard URI or method handler via [pixl-server-web](https://npmjs.com/package/pixl-server-web#custom-uri-handlers), which will initially run in the parent process.  Then, you can choose to delegate the request over to a worker pool, or not.
+For more control over your request workflow, you can choose exactly how and when to delegate requests to worker pools.  To do this, add a standard URI or method handler via [pixl-server-web](https://github.com/jhuckaby/pixl-server-web#custom-uri-handlers), which will initially run in the parent process.  Then, you can choose to delegate the request over to a worker pool, or not.
 
-This code snippet assumes you have a preconfigured worker pool named `MyTestPool1`, and your [pixl-server](https://npmjs.com/package/pixl-server) instance is in scope and named `server`.
+This code snippet assumes you have a preconfigured worker pool named `MyTestPool1`, and your [pixl-server](https://github.com/jhuckaby/pixl-server) instance is in scope and named `server`.
 
 ```js
 server.startup( function() {
 	// server startup complete, get a ref to our worker pool
-	var pool = server.PoolManager.getPool('MyTestPool1');
+	let pool = server.PoolManager.getPool('MyTestPool1');
 	
 	// add handler for our URI (runs in main process)
 	server.WebServer.addURIHandler( /^\/pool1/, 'Pool Or Not', function(args, callback) {
@@ -401,14 +401,14 @@ server.startup( function() {
 
 This is just a silly example that uses `Math.random()` to randomly delegate about half of all `/pool1` requests to the `MyTestPool1` worker pool, and serves the other half normally in the main (parent) process.  This demonstrates the [PoolManager.getPool()](#poolmanagergetpool) and [WorkerPool.delegateRequest()](#workerpooldelegaterequest) APIs.
 
-If you want to include custom data along with the request to your worker, you can put it into `args.params`.  This object is serialized to JSON and passed directly to the worker script, and it can be used however you like.  Note that it may already contain data, as it contains HTTP POST params, among other things (see [args.params](https://www.npmjs.com/package/pixl-server-web#argsparams)).
+If you want to include custom data along with the request to your worker, you can put it into `args.params`.  This object is serialized to JSON and passed directly to the worker script, and it can be used however you like.  Note that it may already contain data, as it contains HTTP POST params, among other things (see [args.params](https://www.github.com/jhuckaby/pixl-server-web#argsparams)).
 
-If you want to intercept the *response* coming back from the worker, you can do that as well.  Instead of passing along the web callback to `delegateRequest()`, you can provide your own.  Your callback will receive the standard 3 arguments from [pixl-server-web](https://npmjs.com/package/pixl-server-web#custom-uri-handlers) URI handlers (i.e. HTTP status, headers, and body).  You can manipulate these, perform additional work, and finally execute the original callback to send the response to the client.  Example:
+If you want to intercept the *response* coming back from the worker, you can do that as well.  Instead of passing along the web callback to `delegateRequest()`, you can provide your own.  Your callback will receive the standard 3 arguments from [pixl-server-web](https://github.com/jhuckaby/pixl-server-web#custom-uri-handlers) URI handlers (i.e. HTTP status, headers, and body).  You can manipulate these, perform additional work, and finally execute the original callback to send the response to the client.  Example:
 
 ```js
 server.startup( function() {
 	// server startup complete, get a ref to our worker pool
-	var pool = server.PoolManager.getPool('MyTestPool1');
+	let pool = server.PoolManager.getPool('MyTestPool1');
 	
 	// add handler for our URI (runs in main process)
 	server.WebServer.addURIHandler( /^\/pool1/, 'My Pool', function(args, callback) {
@@ -519,11 +519,11 @@ exports.handler = function(args, callback) {
 };
 ```
 
-As you can see the handler `callback()` accepts the standard 3 arguments from [pixl-server-web](https://npmjs.com/package/pixl-server-web#custom-uri-handlers) URI handlers (i.e. HTTP status, headers, and body).  However, you have more options available in worker scripts, including the ability to send back JSON (see [JSON Responses](#json-responses)), binary buffers (see [Binary Responses](#binary-responses)), or entire files (see [File Responses](#file-responses)).
+As you can see the handler `callback()` accepts the standard 3 arguments from [pixl-server-web](https://github.com/jhuckaby/pixl-server-web#custom-uri-handlers) URI handlers (i.e. HTTP status, headers, and body).  However, you have more options available in worker scripts, including the ability to send back JSON (see [JSON Responses](#json-responses)), binary buffers (see [Binary Responses](#binary-responses)), or entire files (see [File Responses](#file-responses)).
 
 #### args
 
-The `args` object, passed to your worker `handler()` function, contains *almost* identical contents to the one in [pixl-server-web](https://www.npmjs.com/package/pixl-server-web#args), with a few notable exceptions:
+The `args` object, passed to your worker `handler()` function, contains *almost* identical contents to the one in [pixl-server-web](https://www.github.com/jhuckaby/pixl-server-web#args), with a few notable exceptions:
 
 - `args.request` is present, but it's not a real [http.IncomingMessage](https://nodejs.org/api/http.html#http_class_http_incomingmessage) object.
 	- It has all the essentials, though (see below for details).
@@ -545,11 +545,11 @@ The `args` object should still provide everything you need to serve the request,
 | `args.request.headers` | An object containing all the request headers, keys lower-cased. |
 | `args.request.httpVersion` | The HTTP protocol version, e.g. `1.1`. |
 | `args.socket.remoteAddress` | An alias for `args.ip`. |
-| `args.params` | All HTTP POST params, parsed JSON, etc. (see [args.params](https://npmjs.com/package/pixl-server-web#argsparams)). |
-| `args.query` | The parsed query string as key/value pairs (see [args.query](https://npmjs.com/package/pixl-server-web#argsquery)). |
-| `args.cookies` | The parsed cookie as key/value pairs (see [args.cookies](https://npmjs.com/package/pixl-server-web#argscookies)). |
-| `args.files` | All uploaded files (see [args.files](https://www.npmjs.com/package/pixl-server-web#argsfiles)). |
-| `args.perf` | A [pixl-perf](https://www.npmjs.com/package/pixl-perf) object you can use for tracking app performance (see [Performance Tracking](#performance-tracking)). |
+| `args.params` | All HTTP POST params, parsed JSON, etc. (see [args.params](https://github.com/jhuckaby/pixl-server-web#argsparams)). |
+| `args.query` | The parsed query string as key/value pairs (see [args.query](https://github.com/jhuckaby/pixl-server-web#argsquery)). |
+| `args.cookies` | The parsed cookie as key/value pairs (see [args.cookies](https://github.com/jhuckaby/pixl-server-web#argscookies)). |
+| `args.files` | All uploaded files (see [args.files](https://www.github.com/jhuckaby/pixl-server-web#argsfiles)). |
+| `args.perf` | A [pixl-perf](https://www.github.com/jhuckaby/pixl-perf) object you can use for tracking app performance (see [Performance Tracking](#performance-tracking)). |
 | `args.response.type` | Specifies the response type, e.g. `string`, `buffer`, `json` (see below). |
 | `args.response.status` | The HTTP response code, e.g. `200 OK`, `404 Not Found`. |
 | `args.response.headers` | The response headers (key/value pairs, mixed case). |
@@ -558,7 +558,7 @@ The `args` object should still provide everything you need to serve the request,
 
 #### Text Responses
 
-To send a text response from your worker, you can simply fire the callback with the standard 3 arguments from [pixl-server-web](https://npmjs.com/package/pixl-server-web#custom-uri-handlers) URI handlers (i.e. HTTP status, headers, and body).  Example:
+To send a text response from your worker, you can simply fire the callback with the standard 3 arguments from [pixl-server-web](https://github.com/jhuckaby/pixl-server-web#custom-uri-handlers) URI handlers (i.e. HTTP status, headers, and body).  Example:
 
 ```js
 callback( 
@@ -582,10 +582,10 @@ callback();
 
 To send a binary response from your worker, you can use a [Buffer](https://nodejs.org/api/buffer.html) object.  However, depending on the size of the data, you may want to consider using a file instead (see [File Responses](#file-responses) below).  The reason is memory, as the buffer has to momentarily exist in both the child and the parent.  For larger blobs, a file may be faster.
 
-To send a Buffer, fire the callback with the standard 3 arguments from [pixl-server-web](https://npmjs.com/package/pixl-server-web#custom-uri-handlers) URI handlers, but pass the Buffer as the body (3rd argument).  Example:
+To send a Buffer, fire the callback with the standard 3 arguments from [pixl-server-web](https://github.com/jhuckaby/pixl-server-web#custom-uri-handlers) URI handlers, but pass the Buffer as the body (3rd argument).  Example:
 
 ```js
-var buf = fs.readFileSync('binary-image.gif');
+let buf = fs.readFileSync('binary-image.gif');
 
 callback( 
 	"200 OK", 
@@ -597,7 +597,7 @@ callback(
 Alternatively, you can set the following properties in the `args.response` object, and then fire the callback without any arguments.  Example:
 
 ```js
-var buf = fs.readFileSync('binary-image.gif');
+let buf = fs.readFileSync('binary-image.gif');
 
 args.response.status = "200 OK";
 args.response.headers['Content-Type'] = "image/gif";
@@ -641,15 +641,15 @@ callback();
 You can, of course, construct and send back your own custom error responses, but if you would prefer a generic one, simply send an `Error` object (or any subclass thereof) to your worker handler callback as the sole argument.  Example:
 
 ```js
-var err = new Error("Something went wrong in a worker!");
+let err = new Error("Something went wrong in a worker!");
 callback( err );
 ```
 
-This will be sent back to the client as an `HTTP 500 Internal Server Error`, with the response body set to the `Error` object cast to a string.  The error will also be logged to the main [pixl-server](https://www.npmjs.com/package/pixl-server) logging system (see [Logging](#logging) below).
+This will be sent back to the client as an `HTTP 500 Internal Server Error`, with the response body set to the `Error` object cast to a string.  The error will also be logged to the main [pixl-server](https://www.github.com/jhuckaby/pixl-server) logging system (see [Logging](#logging) below).
 
 #### Performance Tracking
 
-If you want to track application performance in your workers, a [pixl-perf](https://www.npmjs.com/package/pixl-perf) instance is made available to your handler function, in `args.perf`.  Metrics from this performance object are sent back to the main web server process, where they are logged (if [transaction logging](https://www.npmjs.com/package/pixl-server-web#logging) is enabled) and also exposed in the [getStats() API](https://www.npmjs.com/package/pixl-server-web#stats).
+If you want to track application performance in your workers, a [pixl-perf](https://www.github.com/jhuckaby/pixl-perf) instance is made available to your handler function, in `args.perf`.  Metrics from this performance object are sent back to the main web server process, where they are logged (if [transaction logging](https://www.github.com/jhuckaby/pixl-server-web#logging) is enabled) and also exposed in the [getStats() API](https://www.github.com/jhuckaby/pixl-server-web#stats).
 
 You can track metrics directly on the `args.perf` object like this:
 
@@ -659,11 +659,11 @@ args.perf.begin('my_engine');
 args.perf.end('my_engine');
 ```
 
-Or you can track metrics independently using your own [pixl-perf](https://www.npmjs.com/package/pixl-perf) instances, and import them into `args.perf` at the very end of the request, just before you fire the callback:
+Or you can track metrics independently using your own [pixl-perf](https://www.github.com/jhuckaby/pixl-perf) instances, and import them into `args.perf` at the very end of the request, just before you fire the callback:
 
 ```js
-var Perf = require('pixl-perf');
-var my_perf = new Perf();
+let Perf = require('pixl-perf');
+let my_perf = new Perf();
 
 my_perf.begin('my_engine');
 // do some work
@@ -679,7 +679,7 @@ callback( "200 OK", {}, "Success!" );
 
 You may want to perform URI routing in the child worker rather than, or in addition to, the parent web server process.  For example, your worker may serve multiple roles, activated by different URIs.  In this case you'd want to first route *all* applicable traffic to the worker, but then perform further routing into the correct API function in your worker script.
 
-Here is how you can accomplish this.  First, setup your pool to capture all applicable URIs for your application, in the following example any URI that starts with `/pool`, either by using the `uri_match` property in your pool configuration, or by calling [addURIHandler()](https://www.npmjs.com/package/pixl-server-web#custom-uri-handlers) in the parent process.  Example of the former:
+Here is how you can accomplish this.  First, setup your pool to capture all applicable URIs for your application, in the following example any URI that starts with `/pool`, either by using the `uri_match` property in your pool configuration, or by calling [addURIHandler()](https://www.github.com/jhuckaby/pixl-server-web#custom-uri-handlers) in the parent process.  Example of the former:
 
 ```js
 "PoolManager": {
@@ -725,9 +725,9 @@ exports.myAppRoute2 = function(args, callback) {
 };
 ```
 
-The idea here is that the [Worker.addURIHandler()](#workeraddurihandler) method provides a similar URI routing setup as the one in [pixl-server-web](https://www.npmjs.com/package/pixl-server-web#custom-uri-handlers), but performs the routing in the child worker itself.
+The idea here is that the [Worker.addURIHandler()](#workeraddurihandler) method provides a similar URI routing setup as the one in [pixl-server-web](https://www.github.com/jhuckaby/pixl-server-web#custom-uri-handlers), but performs the routing in the child worker itself.
 
-Please note that if you require [ACL restrictions](https://npmjs.com/package/pixl-server-web#access-control-lists) you need to apply them in the parent (web server) process, and not in the child worker.
+Please note that if you require [ACL restrictions](https://github.com/jhuckaby/pixl-server-web#access-control-lists) you need to apply them in the parent (web server) process, and not in the child worker.
 
 ### Worker Logging
 
@@ -742,7 +742,7 @@ exports.startup = function(worker, callback) {
 	this.worker = worker;
 	
 	// setup our own logger
-	var columns = ['hires_epoch', 'date', 'hostname', 'pid', 'component', 'category', 'code', 'msg', 'data'];
+	let columns = ['hires_epoch', 'date', 'hostname', 'pid', 'component', 'category', 'code', 'msg', 'data'];
 	this.logger = new Logger( 'logs/worker.log', columns );
 	
 	// attach logger to worker
@@ -828,7 +828,7 @@ It is highly recommended that you set the `max_concurrent_requests` pool configu
 
 So if your workers can only serve 1 concurrent request but your `max_children` is 10, then `max_concurrent_requests` should probably be 10 as well.  However, if your workers can serve multiple concurrent requests, feel free to increase `max_concurrent_requests` beyond your max children.
 
-This request limit can be somewhat governed by the [http_max_connections](https://www.npmjs.com/package/pixl-server-web#http_max_connections) setting in [pixl-server-web](https://www.npmjs.com/package/pixl-server-web), but that is talking about socket connections specifically.  A socket may be open but inactive (i.e. keep-alive), and also the pixl-server-pool module can run independently of pixl-server-web, hence the need for its own concurrent request limit.
+This request limit can be somewhat governed by the [http_max_connections](https://www.github.com/jhuckaby/pixl-server-web#http_max_connections) setting in [pixl-server-web](https://www.github.com/jhuckaby/pixl-server-web), but that is talking about socket connections specifically.  A socket may be open but inactive (i.e. keep-alive), and also the pixl-server-pool module can run independently of pixl-server-web, hence the need for its own concurrent request limit.
 
 ### Request Queue
 
@@ -840,7 +840,7 @@ When a pool is servicing the maximum concurrent requests and more keep coming in
 
 This would allow up to 768 requests to be queued up, before it started rejecting any.  The queue system is only used if the `max_concurrent_requests` ceiling is reached, and additional pool requests are received.  Queued requests are serviced in the order in which they were received.
 
-It should be noted that the `max_queue_size` plus the `max_concurrent_requests` should never total more than the [http_max_connections](https://www.npmjs.com/package/pixl-server-web#http_max_connections) setting in [pixl-server-web](https://www.npmjs.com/package/pixl-server-web).  If the latter limit is reached, new sockets are hard-closed.  You should always leave some breathing room, for non-pool HTTP requests to be serviced, such as health checks, etc.
+It should be noted that the `max_queue_size` plus the `max_concurrent_requests` should never total more than the [http_max_connections](https://www.github.com/jhuckaby/pixl-server-web#http_max_connections) setting in [pixl-server-web](https://www.github.com/jhuckaby/pixl-server-web).  If the latter limit is reached, new sockets are hard-closed.  You should always leave some breathing room, for non-pool HTTP requests to be serviced, such as health checks, etc.
 
 ### Max Requests Per Child
 
@@ -866,13 +866,13 @@ The `child_cooldown_sec` pool configuration property sets a minimum amount of ti
 
 If you need to temporarily take your workers offline to run maintenance on them (i.e. garbage collection or other), you can do that with a rolling maintenance sweep.  As long as you have multiple children, this should be a zero-downtime affair, as each child is taken out of rotation safely (well, up to `max_concurrent_maint` children at a time).  When maintenance is completed, the child is put back into live rotation.  You can control exactly what happens during maintenance, by declaring a special exported `maint()` function in your worker script.
 
-You can request a rolling maintenance sweep yourself using the [WorkerPool.requestMaint()](#workerpoolrequestmaint) call, or you can have the system routinely schedule maintenance sweeps every N requests or N seconds.  Here is an example which fires it off via a web request ([ACL restricted](https://npmjs.com/package/pixl-server-web#access-control-lists) of course):
+You can request a rolling maintenance sweep yourself using the [WorkerPool.requestMaint()](#workerpoolrequestmaint) call, or you can have the system routinely schedule maintenance sweeps every N requests or N seconds.  Here is an example which fires it off via a web request ([ACL restricted](https://github.com/jhuckaby/pixl-server-web#access-control-lists) of course):
 
 ```js
 // in main process
 server.startup( function() {
 	// server startup complete, get a ref to our worker pool
-	var pool = server.PoolManager.getPool('MyTestPool1');
+	let pool = server.PoolManager.getPool('MyTestPool1');
 	
 	// add URI handler for requesting a rolling maintenance sweep
 	server.WebServer.addURIHandler( /^\/pool\/maint$/, 'Pool Maintenance', true, function(args, callback) {
@@ -929,13 +929,13 @@ This would run maintenance every 300 seconds (5 minutes).  Note that both method
 
 ## Rolling Restarts
 
-If you need to restart all your workers and replace them with new ones, you can do that with a rolling restart request.  As long as you have multiple children, this should be a zero-downtime affair, as each child is taken out of rotation individually (well, up to `max_concurrent_launches` children at a time).  You can request a rolling restart using the [WorkerPool.requestRestart()](#workerpoolrequestrestart) call.  Here is an example which fires it off via a web request ([ACL restricted](https://npmjs.com/package/pixl-server-web#access-control-lists) of course):
+If you need to restart all your workers and replace them with new ones, you can do that with a rolling restart request.  As long as you have multiple children, this should be a zero-downtime affair, as each child is taken out of rotation individually (well, up to `max_concurrent_launches` children at a time).  You can request a rolling restart using the [WorkerPool.requestRestart()](#workerpoolrequestrestart) call.  Here is an example which fires it off via a web request ([ACL restricted](https://github.com/jhuckaby/pixl-server-web#access-control-lists) of course):
 
 ```js
 // in main process
 server.startup( function() {
 	// server startup complete, get a ref to our worker pool
-	var pool = server.PoolManager.getPool('MyTestPool1');
+	let pool = server.PoolManager.getPool('MyTestPool1');
 	
 	// add URI handler for requesting a rolling restart
 	server.WebServer.addURIHandler( /^\/pool\/restart$/, 'Pool Restart', true, function(args, callback) {
@@ -970,7 +970,7 @@ Here is an example.  This code snippet runs in the parent (web server) process, 
 
 ```js
 // in main web server process
-var user_req = {
+let user_req = {
 	// custom request object, can contain anything you want
 	myKey1: "My Value 1",
 	myComplexObject: [ 1, 2, "Three", { Four: 4 } ]
@@ -1018,7 +1018,7 @@ The custom request version of the `args` object is pretty minimal, compared to t
 | `args.cmd` | Specifies the type of request, which will always be `custom` in this case. |
 | `args.id` | A unique identifier for the request, used internally to match it up with the correct calling thread. |
 | `args.params` | A copy of your user-defined request object, which you passed to [WorkerPool.delegateCustom()](#workerpooldelegatecustom). |
-| `args.perf` | A [pixl-perf](https://www.npmjs.com/package/pixl-perf) object you can use for tracking app performance (see [Performance Tracking](#performance-tracking)). |
+| `args.perf` | A [pixl-perf](https://www.github.com/jhuckaby/pixl-perf) object you can use for tracking app performance (see [Performance Tracking](#performance-tracking)). |
 
 When using `args.perf` for tracking performance in your worker custom requests, please note that the metrics aren't logged or used in the web server process at all, like they are with delegated web requests.  For custom requests, you have to explicitly receive the performance object, and log or otherwise use the metrics yourself.  `args.perf` is passed to the [WorkerPool.delegateCustom](#workerpooldelegatecustom) callback as the 3rd argument, after your custom response object:
 
@@ -1124,9 +1124,9 @@ The PID can be useful because you can pass it to [WorkerPool.getWorker()](#worke
 
 ## Uncaught Exceptions
 
-You can opt-in to allow the [uncatch](https://www.npmjs.com/package/uncatch) module to manage uncaught exceptions for you.  This is done by setting the global `uncatch` configuration property to `true`, and will cause the pooler to register its own listener that shuts down all pools and all workers on any uncaught exception.
+You can opt-in to allow the [uncatch](https://www.github.com/jhuckaby/uncatch) module to manage uncaught exceptions for you.  This is done by setting the global `uncatch` configuration property to `true`, and will cause the pooler to register its own listener that shuts down all pools and all workers on any uncaught exception.
 
-The idea with [uncatch](https://www.npmjs.com/package/uncatch) is that multiple modules can all register listeners, and that includes your application code.  Example:
+The idea with [uncatch](https://www.github.com/jhuckaby/uncatch) is that multiple modules can all register listeners, and that includes your application code.  Example:
 
 ```js
 // in main web server process
@@ -1209,14 +1209,14 @@ This section is a reference for all classes and methods.
 
 ### PoolManager
 
-The `PoolManager` class is a singleton, and is the main [pixl-server](https://npmjs.com/package/pixl-server) component which runs the pool show.  It manages all worker pools, and provides the main entry point for API calls.  You can gain access via the `PoolManager` property in the main server object.  Example:
+The `PoolManager` class is a singleton, and is the main [pixl-server](https://github.com/jhuckaby/pixl-server) component which runs the pool show.  It manages all worker pools, and provides the main entry point for API calls.  You can gain access via the `PoolManager` property in the main server object.  Example:
 
 ```js
 // in main web server process
-var poolmgr = server.PoolManager;
+let poolmgr = server.PoolManager;
 ```
 
-This code snippet assumes your [pixl-server](https://npmjs.com/package/pixl-server) instance is in scope and named `server`.
+This code snippet assumes your [pixl-server](https://github.com/jhuckaby/pixl-server) instance is in scope and named `server`.
 
 #### PoolManager.getPool
 
@@ -1224,10 +1224,10 @@ The `getPool()` method retrieves a [WorkerPool](#workerpool) object given its ID
 
 ```js
 // in main web server process
-var pool = server.PoolManager.getPool('MyTestPool1');
+let pool = server.PoolManager.getPool('MyTestPool1');
 ```
 
-This code snippet assumes your [pixl-server](https://npmjs.com/package/pixl-server) instance is in scope and named `server`.
+This code snippet assumes your [pixl-server](https://github.com/jhuckaby/pixl-server) instance is in scope and named `server`.
 
 #### PoolManager.getPools
 
@@ -1235,8 +1235,8 @@ The `getPools()` method retrieves all the current active [WorkerPool](#workerpoo
 
 ```js
 // in main web server process
-var pools = server.PoolManager.getPools();
-var pool = pools['MyTestPool1'];
+let pools = server.PoolManager.getPools();
+let pool = pools['MyTestPool1'];
 ```
 
 #### PoolManager.createPool
@@ -1245,12 +1245,12 @@ The `createPool()` method allows you to dynamically create a new [WorkerPool](#w
 
 ```js
 // in main web server process
-var config = {
+let config = {
 	"script": "my_new_worker.js",
 	"min_children": 1,
 	"max_children": 2
 };
-var pool = server.PoolManager.createPool( 'MyNewPool', config, function(err) {
+let pool = server.PoolManager.createPool( 'MyNewPool', config, function(err) {
 	if (err) throw err;
 	// if no error then pool has started up successfully and is ready to work
 } );
@@ -1276,13 +1276,13 @@ The `WorkerPool` class represents one pool of workers.  It can be retrieved by c
 
 #### WorkerPool.delegateRequest
 
-The `WorkerPool.delegateRequest()` method delegates a web request to a worker pool.  It picks a suitable worker using the [Worker Selection Algorithm](#worker-selection-algorithm).  It should be passed the [args](https://www.npmjs.com/package/pixl-server-web#args) object from [pixl-server-web](https://www.npmjs.com/package/pixl-server-web), and the web callback.  Example:
+The `WorkerPool.delegateRequest()` method delegates a web request to a worker pool.  It picks a suitable worker using the [Worker Selection Algorithm](#worker-selection-algorithm).  It should be passed the [args](https://www.github.com/jhuckaby/pixl-server-web#args) object from [pixl-server-web](https://www.github.com/jhuckaby/pixl-server-web), and the web callback.  Example:
 
 ```js
 // in main web server process
 server.startup( function() {
 	// server startup complete, get a ref to our worker pool
-	var pool = server.PoolManager.getPool('MyTestPool1');
+	let pool = server.PoolManager.getPool('MyTestPool1');
 	
 	// add handler for our URI (runs in main process)
 	server.WebServer.addURIHandler( /^\/pool1/, 'My Pool', function(args, callback) {
@@ -1293,7 +1293,7 @@ server.startup( function() {
 } );
 ```
 
-This code snippet assumes you have a preconfigured worker pool named `MyTestPool1`, and your [pixl-server](https://npmjs.com/package/pixl-server) instance is in scope and named `server`.
+This code snippet assumes you have a preconfigured worker pool named `MyTestPool1`, and your [pixl-server](https://github.com/jhuckaby/pixl-server) instance is in scope and named `server`.
 
 You can also intercept the response from the worker by providing your own callback.  See [Manual Request Routing](#manual-request-routing) for more details.
 
@@ -1373,7 +1373,7 @@ The `WorkerPool.getWorkers` method returns an object containing all current work
 
 ```js
 // in main web server process
-var workers = pool.getWorkers();
+let workers = pool.getWorkers();
 ```
 
 This code snippet assumes you have a `pool` variable in scope, which was obtained by calling [PoolManager.getPool()](#poolmanagergetpool).
@@ -1384,7 +1384,7 @@ The `WorkerPool.getWorker()` method fetches a single worker from the pool, given
 
 ```js
 // in main web server process
-var worker = pool.getWorker( 1234 ); // pid
+let worker = pool.getWorker( 1234 ); // pid
 ```
 
 This code snippet assumes you have a `pool` variable in scope, which was obtained by calling [PoolManager.getPool()](#poolmanagergetpool).
@@ -1411,25 +1411,25 @@ The `WorkerProxy` class represents one single worker in a pool, but runs in the 
 
 #### WorkerProxy.delegateRequest
 
-The `WorkerProxy.delegateRequest()` method delegates a web request to a specific worker.  It bypasses the [Worker Selection Algorithm](#worker-selection-algorithm) and targets the exact worker you call it on.  This is an advanced function and should be used with great care.  It should be passed the [args](https://www.npmjs.com/package/pixl-server-web#args) object from [pixl-server-web](https://www.npmjs.com/package/pixl-server-web), and the web callback.  Example:
+The `WorkerProxy.delegateRequest()` method delegates a web request to a specific worker.  It bypasses the [Worker Selection Algorithm](#worker-selection-algorithm) and targets the exact worker you call it on.  This is an advanced function and should be used with great care.  It should be passed the [args](https://www.github.com/jhuckaby/pixl-server-web#args) object from [pixl-server-web](https://www.github.com/jhuckaby/pixl-server-web), and the web callback.  Example:
 
 ```js
 // in main web server process
 server.startup( function() {
 	// server startup complete, get a ref to our worker pool
-	var pool = server.PoolManager.getPool('MyTestPool1');
+	let pool = server.PoolManager.getPool('MyTestPool1');
 	
 	// add handler for our URI (runs in main process)
 	server.WebServer.addURIHandler( /^\/pool1/, 'My Pool', function(args, callback) {
 		// custom request handler for our URI
 		// delegate request to specific worker in pool (handles response as well)
-		var worker = pool.getWorker( 1234 ); // PID
+		let worker = pool.getWorker( 1234 ); // PID
 		worker.delegateRequest( args, callback );
 	} );
 } );
 ```
 
-This code snippet assumes you have a preconfigured worker pool named `MyTestPool1`, and your [pixl-server](https://npmjs.com/package/pixl-server) instance is in scope and named `server`.
+This code snippet assumes you have a preconfigured worker pool named `MyTestPool1`, and your [pixl-server](https://github.com/jhuckaby/pixl-server) instance is in scope and named `server`.
 
 #### WorkerProxy.delegateCustom
 
@@ -1437,7 +1437,7 @@ The `WorkerProxy.delegateCustom()` method sends a custom request to a specific w
 
 ```js
 // in main web server process
-var worker = pool.getWorker( 1234 ); // PID
+let worker = pool.getWorker( 1234 ); // PID
 
 // send custom request to a specific worker
 worker.delegateCustom( { custom1: 12345, custom2: "Hello" }, function(err, user_resp) {
@@ -1457,7 +1457,7 @@ The `WorkerProxy.sendMessage()` method sends a custom message to a *single* work
 
 ```js
 // in main web server process
-var worker = pool.getWorker( 1234 ); // PID
+let worker = pool.getWorker( 1234 ); // PID
 worker.sendMessage({ myKey1: 12345, myKey2: "Custom!" });
 ```
 
@@ -1469,7 +1469,7 @@ The `WorkerProxy.shutdown()` method shuts down a worker (kills the child process
 
 ```js
 // in main web server process
-var worker = pool.getWorker( 1234 ); // PID
+let worker = pool.getWorker( 1234 ); // PID
 worker.shutdown();
 ```
 
@@ -1494,7 +1494,7 @@ The `Worker.config` property is a copy of the worker pool's configuration object
 
 #### Worker.addURIHandler
 
-The `Worker.addURIHandler()` method allows you to add URI routing in your worker script, as opposed to (or in addition to) URI routing in the main (web server) process.  The calling convention is similar to [pixl-server-web](https://www.npmjs.com/package/pixl-server-web#custom-uri-handlers).  Example:
+The `Worker.addURIHandler()` method allows you to add URI routing in your worker script, as opposed to (or in addition to) URI routing in the main (web server) process.  The calling convention is similar to [pixl-server-web](https://www.github.com/jhuckaby/pixl-server-web#custom-uri-handlers).  Example:
 
 ```js
 // in my_worker.js
@@ -1564,7 +1564,7 @@ The `HTTP 504 Gateway Timeout` error is sent back to clients if a worker takes t
 
 ## Logging
 
-The pooler uses the logging system built into [pixl-server](https://www.npmjs.com/package/pixl-server#logging).  The `component` column will be set to either `PoolManager` or `Pool-[ID]` (where `[ID]` is the ID of your worker pool).  Most debug messages are pool-specific.
+The pooler uses the logging system built into [pixl-server](https://www.github.com/jhuckaby/pixl-server#logging).  The `component` column will be set to either `PoolManager` or `Pool-[ID]` (where `[ID]` is the ID of your worker pool).  Most debug messages are pool-specific.
 
 Here is an example log excerpt showing a typical startup with one pool (`TestPool`) and 2 workers.  In all these log examples the first 3 columns (`hires_epoch`, `date` and `hostname`) are omitted for display purposes.  The columns shown are `component`, `category`, `code`, `msg`, and `data`.
 
@@ -1586,7 +1586,7 @@ Here is an example log excerpt showing a typical startup with one pool (`TestPoo
 [Pool-TestPool][debug][2][Pool startup complete][]
 ```
 
-Here is a single delegated web request (most of this is logged by [pixl-server-web](https://www.npmjs.com/package/pixl-server-web)):
+Here is a single delegated web request (most of this is logged by [pixl-server-web](https://www.github.com/jhuckaby/pixl-server-web)):
 
 ```
 [WebServer][debug][8][New incoming HTTP connection: c8][{"ip":"::ffff:127.0.0.1","num_conns":1}]
@@ -1713,7 +1713,7 @@ Here is an example of an error (in this case an [HTTP 500](#http-500-internal-se
 [Pool-TestPool][error][500][Error: Test Error Message][{"request_id":"rj5hr4brm01","worker":6697}]
 ```
 
-If you have [http_log_requests](https://www.npmjs.com/package/pixl-server-web#http_log_requests) enabled in your [pixl-server-web](https://www.npmjs.com/package/pixl-server-web) configuration, all HTTP errors are also logged as transactions:
+If you have [http_log_requests](https://www.github.com/jhuckaby/pixl-server-web#http_log_requests) enabled in your [pixl-server-web](https://www.github.com/jhuckaby/pixl-server-web) configuration, all HTTP errors are also logged as transactions:
 
 ```
 [WebServer][transaction][HTTP 500 Internal Server Error][/pool?error=1][{"proto":"http","ips":["::ffff:127.0.0.1"],"host":"127.0.0.1:3012","ua":"curl/7.54.0","perf":{"scale":1000,"perf":{"total":12.017,"read":0.37,"process":5.741,"worker":3.837,"write":4.419},"counters":{"bytes_in":90,"bytes_out":104,"num_requests":1}}}]
