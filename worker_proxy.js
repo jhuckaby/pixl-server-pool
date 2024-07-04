@@ -59,7 +59,7 @@ module.exports = Class.create({
 		else {
 			// standard worker.js wrapper
 			child_args = [].concat(
-				process.execArgv,
+				this.config.exec_argv || process.execArgv,
 				Path.join( __dirname, "worker.js" ),
 				process.argv.slice(2)
 			);
