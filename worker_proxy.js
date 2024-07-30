@@ -73,6 +73,26 @@ module.exports = Class.create({
 			gid: process.getgid()
 		}, this.config.exec_opts );
 		
+		// resolve alphanumeric UID/GID to numeric (these are cached in RAM by pixl-tools)
+		if (typeof(child_opts.uid) == 'string') {
+			var user_info = Tools.getpwnam( child_opts.uid, true );
+			if (!user_info) {
+				var err = new Error("Unknown user: " + child_opts.uid);
+				this.logError("child", "Child spawn error: " + (err.message || err));
+				return callback(err);
+			}
+			child_opts.uid = user_info.uid;
+		}
+		if (typeof(child_opts.gid) == 'string') {
+			var grp_info = Tools.getgrnam( child_opts.gid, true );
+			if (!grp_info) {
+				var err = new Error("Unknown group: " + child_opts.gid);
+				this.logError("child", "Child spawn error: " + (err.message || err));
+				return callback(err);
+			}
+			child_opts.gid = grp_info.gid;
+		}
+		
 		// spawn child
 		try {
 			this.child = cp.spawn( child_cmd, child_args, child_opts );

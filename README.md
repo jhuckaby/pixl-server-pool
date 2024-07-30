@@ -236,7 +236,7 @@ Here is the complete list of available properties for your pool definitions:
 
 ### Child Spawn Options
 
-If you specify an `exec_opts` object in your pool configuration, you can set properties that are passed directly to the [child_process.spawn()](https://nodejs.org/api/child_process.html#child_process_child_process_spawn_command_args_options) call in Node.js.  Using this you can set the User ID (UID) and/or Group ID (GID) of your worker processes.  Example:
+If you specify an `exec_opts` object in your pool configuration, you can set properties that are passed to the [child_process.spawn()](https://nodejs.org/api/child_process.html#child_process_child_process_spawn_command_args_options) call in Node.js.  Using this you can set the User ID (UID) and/or Group ID (GID) of your worker processes.  Example:
 
 ```js
 "exec_opts": {
@@ -244,6 +244,8 @@ If you specify an `exec_opts` object in your pool configuration, you can set pro
 	"gid": 99
 }
 ```
+
+You can alternatively specify these as alphanumeric (e.g. `www`, `nobody`, etc.) and pixl-server-pool will attempt to resolve them to numeric UIDs/GIDs for you.
 
 ### Child Compression
 
