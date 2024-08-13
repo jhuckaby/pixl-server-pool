@@ -249,7 +249,7 @@ You can alternatively specify these as alphanumeric (e.g. `www`, `nobody`, etc.)
 
 ### Child Compression
 
-Normally, all content compression (i.e. content encoding) happens at the web browser level, i.e. in [pixl-server-web](https://github.com/jhuckaby/pixl-server-web).  However, the web server runs in the parent process, and thus it may become a CPU bottleneck for high traffic applications where all responses are compressed.  To solve this, you can opt to have all encoding happen in the *worker processes* instead.  This effectively allows the compression to be parallelized across CPU cores.  To enable this feature, set the `compress_child` property to `true` in your pool configuration:
+Normally, all content compression (i.e. content encoding) happens at the web server level, i.e. in [pixl-server-web](https://github.com/jhuckaby/pixl-server-web).  However, the web server runs in the parent process, and thus it may become a CPU bottleneck for high traffic applications where all responses are compressed.  To solve this, you can opt to have all encoding happen in the *worker processes* instead.  This effectively allows the compression to be parallelized across CPU cores.  To enable this feature, set the `compress_child` property to `true` in your pool configuration:
 
 ```js
 "MyTestPool1": {
