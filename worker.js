@@ -257,9 +257,28 @@ var worker = {
 			}
 		};
 		
+		// support for SSE
+		req.sse = {
+			send: function(chunk) {
+				// send SSE message, e.g. { id:1, event:update, data:{foo:bar} }
+				if (!chunk || !chunk.data) throw new Error("Must pass chunk with data to sse.send()");
+				self.sendCommand('sse', { id: req.id, chunk });
+				req.sse.enabled = true;
+			},
+			end: function() {
+				// signal end of SSE request
+				if (timed_out || !req.sse.enabled) return;
+				if (timer) { clearTimeout(timer); timer = null; }
+				res.type = 'sse';
+				res.body = '';
+				finishResponse();
+			}
+		}; // sse
+		
 		// handle response back from user obj
 		var handleResponse = function() {
 			// check for timeout first
+			if (req.sse.enabled) return req.sse.end();
 			if (timed_out) return;
 			if (timer) { clearTimeout(timer); timer = null; }
 			

@@ -37,13 +37,16 @@ Worker pools can have a fixed number of workers, or grow/shrink automatically ba
 			- [JSON Responses](#json-responses)
 			- [File Responses](#file-responses)
 			- [Error Responses](#error-responses)
+			- [Server-Sent Events](#server-sent-events)
 			- [Performance Tracking](#performance-tracking)
 			- [Custom Worker URI Routing](#custom-worker-uri-routing)
+		+ [Worker Logging](#worker-logging)
 	* [Auto-Scaling](#auto-scaling)
 		+ [Child Headroom](#child-headroom)
 		+ [Max Concurrent Requests](#max-concurrent-requests)
 		+ [Request Queue](#request-queue)
 		+ [Max Requests Per Child](#max-requests-per-child)
+		+ [Child Cooldown](#child-cooldown)
 	* [Rolling Maintenance Sweeps](#rolling-maintenance-sweeps)
 		+ [Automatic Routine Maintenance](#automatic-routine-maintenance)
 	* [Rolling Restarts](#rolling-restarts)
@@ -557,6 +560,7 @@ The `args` object should still provide everything you need to serve the request,
 | `args.response.headers` | The response headers (key/value pairs, mixed case). |
 | `args.response.body` | The response body (String, Buffer, etc.).  See below. |
 | `args.aborted` | Will be set to `true` if the request was aborted, e.g. from a timeout. |
+| `args.sse` | API for sending [Server-Sent Events](#server-sent-events). |
 
 #### Text Responses
 
@@ -649,6 +653,34 @@ callback( err );
 
 This will be sent back to the client as an `HTTP 500 Internal Server Error`, with the response body set to the `Error` object cast to a string.  The error will also be logged to the main [pixl-server](https://www.github.com/jhuckaby/pixl-server) logging system (see [Logging](#logging) below).
 
+#### Server-Sent Events
+
+Your worker code can stream [Server-Sent Events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events) to the client, using a custom API made available in the `args.sse` object.  Since worker code runs in a separate process, the SSE interface is abstracted -- but this also makes it much easier to use.  Instead of having to compose your own raw SSE messages, you can simply call `args.sse.send()` and pass in an object with a `data` property, and optionally an `event` and `id`.  Example:
+
+```js
+// in my_worker.js
+exports.handler = function(args, callback) {
+	// generate special SSE response
+	args.sse.send({ event: 'start', data: { foo: 'go' } });
+	
+	var counter = 0;
+	var timer = setInterval( function() {
+		counter++;
+		args.sse.send({ event: 'update', data: { foo: 'bar', counter: counter } });
+		
+		if (counter == 5) {
+			clearTimeout(timer);
+			args.sse.send({ event: 'stop', data: { foo: 'stop' } });
+			callback();
+		}
+	}, 1000 );
+};
+```
+
+As a convenience, if the `data` property is an object, it is serialized to JSON for you.  Note that you will have to re-parse it on the client-side.
+
+To end an SSE stream, you can call `args.sse.end()`, or just fire the original request callback with no arguments.
+
 #### Performance Tracking
 
 If you want to track application performance in your workers, a [pixl-perf](https://www.github.com/jhuckaby/pixl-perf) instance is made available to your handler function, in `args.perf`.  Metrics from this performance object are sent back to the main web server process, where they are logged (if [transaction logging](https://www.github.com/jhuckaby/pixl-server-web#logging) is enabled) and also exposed in the [getStats() API](https://www.github.com/jhuckaby/pixl-server-web#stats).
@@ -733,7 +765,7 @@ Please note that if you require [ACL restrictions](https://github.com/jhuckaby/p
 
 ### Worker Logging
 
-You can use any logging system in your worker code that you wish.  However, if you happen to use [pixl-logger])(https://github.com/jhuckaby/pixl-logger), you can attach this to the pool worker singleton, to augment your logs with pool-related debug events.  To set this up, call `attachLogAgent()` on the `worker` object in your `startup()` function like this:
+You can use any logging system in your worker code that you wish.  However, if you happen to use [pixl-logger](https://github.com/jhuckaby/pixl-logger), you can attach this to the pool worker singleton, to augment your logs with pool-related debug events.  To set this up, call `attachLogAgent()` on the `worker` object in your `startup()` function like this:
 
 ```js
 // in my_worker.js

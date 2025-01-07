@@ -423,6 +423,25 @@ module.exports = Class.create({
 			return;
 		}
 		
+		// sse chunk
+		if ((data.cmd == 'sse') && data.chunk && data.chunk.data) {
+			var chunk = data.chunk;
+			if (req.args.request.socket.destroyed) return;
+			this.logDebug(10, "Received SSE chunk from child: " + this.pid, chunk);
+			if (typeof(chunk.data) == 'object') chunk.data = JSON.stringify(chunk.data);
+			if (!req.sse) {
+				// start response, delcare it as SSE
+				req.sse = true;
+				req.args.response.setHeader('Content-Type', 'text/event-stream');
+				req.args.response.setHeader('Cache-Control', 'no-cache');
+				req.args.response.writeHead(200, 'OK');
+			}
+			if (chunk.id) req.args.response.write("id: " + chunk.id + "\n");
+			if (chunk.event) req.args.response.write("event: " + chunk.event + "\n");
+			req.args.response.write("data: " + chunk.data + "\n\n");
+			return;
+		}
+		
 		// cancel timeout
 		if (req.timer) {
 			clearTimeout( req.timer );
@@ -485,7 +504,15 @@ module.exports = Class.create({
 		this.pool.num_active_requests--;
 		
 		// fire original webserver callback which sends response to waiting client
-		callback( data.status || "200 OK", data.headers || {}, body );
+		if (req.sse) {
+			// end SSE stream
+			req.args.response.end();
+			callback(true); // handled
+		}
+		else {
+			// end normal request
+			callback( data.status || "200 OK", data.headers || {}, body );
+		}
 	},
 	
 	sendFileResponse: function(data, req) {
