@@ -642,6 +642,18 @@ args.response.body = "/path/to/my/image.gif"; // file path
 callback();
 ```
 
+To have the file automatically deleted by the web server after it is served up (i.e. a temp file), include a `delete` property in the `args.response` object, and set it to `true`:
+
+```js
+args.response.type = "file";
+args.response.status = "200 OK";
+args.response.headers['Content-Type'] = "image/gif";
+args.response.body = "/path/to/my/image.gif"; // file path
+args.response.delete = true; // auto-delete file
+
+callback();
+```
+
 #### Error Responses
 
 You can, of course, construct and send back your own custom error responses, but if you would prefer a generic one, simply send an `Error` object (or any subclass thereof) to your worker handler callback as the sole argument.  Example:
